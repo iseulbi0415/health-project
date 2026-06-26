@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>안심 건강 트래커</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <header class="app-header">
+    <div class="header-inner">
+      <span class="app-logo">💊</span>
+      <h1 class="app-title">안심 건강 트래커</h1>
+      <p class="app-subtitle">역류성 식도염 케어 & 러닝 관리</p>
+    </div>
+  </header>
+
+  <main class="app-main">
+
+    <!-- ① 소화 타이머 (Killer Feature) -->
+    <section class="card" id="digest-section">
+      <div class="card-header">
+        <span class="card-icon">🔥</span>
+        <h2 class="card-title">안심 소화 타이머</h2>
+      </div>
+
+      <!-- 식사 유형 선택 -->
+      <div class="meal-type-selector">
+        <p class="selector-label">식사 유형을 선택하세요</p>
+        <div class="meal-buttons">
+          <button class="meal-btn" data-type="carb" data-hours="2">
+            🍚 탄수화물
+            <span class="meal-time">2시간</span>
+          </button>
+          <button class="meal-btn" data-type="protein" data-hours="2.5">
+            🍗 단백질
+            <span class="meal-time">2.5시간</span>
+          </button>
+          <button class="meal-btn" data-type="fat" data-hours="4">
+            🥩 고지방
+            <span class="meal-time">4시간</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- 게이지 & 타이머 표시 -->
+      <div class="timer-display" id="timer-display" style="display:none;">
+        <div class="gauge-wrap">
+          <div class="gauge-label-row">
+            <span class="gauge-label-left">식사 완료</span>
+            <span class="gauge-label-right" id="gauge-percent">100%</span>
+          </div>
+          <div class="gauge-track">
+            <div class="gauge-bar" id="gauge-bar"></div>
+          </div>
+          <div class="gauge-desc" id="gauge-desc">위장이 소화 중입니다...</div>
+        </div>
+
+        <div class="timer-info">
+          <div class="timer-remaining" id="timer-remaining">--:--:--</div>
+          <div class="timer-sublabel">남은 소화 시간</div>
+        </div>
+
+        <div class="warning-box" id="warning-box">
+          <span class="warning-icon">🙅‍♀️</span>
+          <p class="warning-text">아직 눕지 마세요! 격렬한 운동도 잠시 후에 해주세요.</p>
+        </div>
+
+        <button class="btn-reset" id="btn-reset">타이머 초기화</button>
+      </div>
+    </section>
+
+    <!-- ② BMR 계산기 -->
+    <section class="card" id="bmr-section">
+      <div class="card-header">
+        <span class="card-icon">🔢</span>
+        <h2 class="card-title">BMR 목표 칼로리 계산기</h2>
+      </div>
+      <div class="bmr-form">
+        <div class="input-row">
+          <div class="input-group">
+            <label for="weight">체중 (kg)</label>
+            <input type="number" id="weight" placeholder="예: 65">
+          </div>
+          <div class="input-group">
+            <label for="height">키 (cm)</label>
+            <input type="number" id="height" placeholder="예: 170">
+          </div>
+          <div class="input-group">
+            <label for="age">나이</label>
+            <input type="number" id="age" placeholder="예: 28">
+          </div>
+        </div>
+        <div class="gender-row">
+          <label class="radio-label">
+            <input type="radio" name="gender" value="male" checked> 남성
+          </label>
+          <label class="radio-label">
+            <input type="radio" name="gender" value="female"> 여성
+          </label>
+        </div>
+        <button class="btn-primary" id="btn-calc-bmr">칼로리 계산하기</button>
+        <div class="bmr-result" id="bmr-result" style="display:none;">
+          <div class="result-row">
+            <span class="result-label">기초대사량 (BMR)</span>
+            <span class="result-value" id="bmr-value">— kcal</span>
+          </div>
+          <div class="result-row">
+            <span class="result-label">유지 칼로리</span>
+            <span class="result-value" id="maintain-value">— kcal</span>
+          </div>
+          <div class="result-row highlight">
+            <span class="result-label">증량 목표 칼로리</span>
+            <span class="result-value" id="gain-value">— kcal</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ③ 식단 기록 -->
+    <section class="card" id="diet-section">
+      <div class="card-header">
+        <span class="card-icon">🥗</span>
+        <h2 class="card-title">오늘의 식단 기록</h2>
+      </div>
+
+      <p class="selector-label">자주 먹는 클린식 빠르게 추가</p>
+      <div class="quick-food-buttons" id="quick-food-buttons"></div>
+
+      <div class="manual-input-row">
+        <input type="text" id="food-name-input" placeholder="음식 이름">
+        <input type="number" id="food-cal-input" placeholder="칼로리 (kcal)">
+        <button class="btn-primary" id="btn-add-food">추가</button>
+      </div>
+      <p class="fatsecret-hint">칼로리를 모를 때 →
+        <a href="https://www.fatsecret.kr" target="_blank">FatSecret 칼로리 검색 🔗</a>
+      </p>
+
+      <div class="diet-log-list" id="diet-log-list"></div>
+      <div class="diet-total-row">
+        <span>오늘 총 섭취</span>
+        <span id="total-calories"><strong>0</strong> kcal</span>
+      </div>
+    </section>
+
+    <!-- ④ 러닝 기록 -->
+    <section class="card" id="running-section">
+      <div class="card-header">
+        <span class="card-icon">👟</span>
+        <h2 class="card-title">러닝 기록 일지</h2>
+      </div>
+      <div class="running-form">
+        <div class="input-row">
+          <div class="input-group">
+            <label>거리 (km)</label>
+            <input type="number" id="run-distance" placeholder="예: 5.2" step="0.1">
+          </div>
+          <div class="input-group">
+            <label>시간 (분)</label>
+            <input type="number" id="run-time" placeholder="예: 32">
+          </div>
+          <div class="input-group">
+            <label>평균 심박수</label>
+            <input type="number" id="run-hr" placeholder="예: 148">
+          </div>
+        </div>
+        <button class="btn-primary" id="btn-add-run">기록 저장</button>
+      </div>
+      <div class="run-log-list" id="run-log-list"></div>
+    </section>
+
+    <!-- ⑤ 컨디션 메모 -->
+    <section class="card" id="condition-section">
+      <div class="card-header">
+        <span class="card-icon">📝</span>
+        <h2 class="card-title">오늘의 컨디션 메모</h2>
+      </div>
+      <div class="input-group">
+        <label>오늘 체중 (kg)</label>
+        <input type="number" id="today-weight" placeholder="예: 67.3" step="0.1">
+      </div>
+      <div class="input-group" style="margin-top:12px;">
+        <label>소화 상태 / 역류 증상 / 운동 피드백</label>
+        <textarea id="condition-memo" rows="4" placeholder="예: 점심 후 약간 역류감. 저녁 러닝은 컨디션 좋음."></textarea>
+      </div>
+      <button class="btn-primary" id="btn-save-memo">메모 저장</button>
+      <p class="memo-saved" id="memo-saved" style="display:none;">✅ 저장되었습니다!</p>
+    </section>
+
+  </main>
+
+  <!-- 운동 가드 모달 -->
+  <div class="modal-overlay" id="guard-modal" style="display:none;">
+    <div class="modal-box">
+      <div class="modal-icon">⚠️</div>
+      <h3 class="modal-title">아직 소화 중입니다</h3>
+      <p class="modal-desc">격렬한 운동은 역류를 유발할 수 있습니다.<br>소화 타이머가 완료된 후 운동을 시작해 주세요.</p>
+      <button class="btn-primary" id="btn-modal-close">확인</button>
+    </div>
+  </div>
+
+  <script src="js/app.js"></script>
+</body>
+</html>
