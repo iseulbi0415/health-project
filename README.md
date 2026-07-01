@@ -19,3 +19,14 @@
 - JS로 탭 버튼 클릭 시 `screens`를 translateX로 슬라이드 이동시키는 기능 구현
 - 클릭한 버튼에만 `active` class 옮겨 붙이는 로직 작성
 - 각 screen(홈/식단/러닝/정보) 안에 실제 콘텐츠 채우기 (기존 app.js 로직과 연결)
+
+## 진행 상황 2026-07-01
+
+### 오늘 한 일
+- [x] 탭 버튼(`tab-btn`) 클릭 시 `screens`를 translateX로 슬라이드시키는 JS 기능 구현
+- [x] 클릭한 버튼에만 `active` 클래스가 옮겨가도록 강조 표시 토글 기능 구현
+- [x] `data-index` 값을 문자열 → 숫자로 변환(`Number()`)하여 이동 거리 계산 로직 작성
+- [x] 이벤트 리스너, querySelectorAll+forEach, 콜백 함수, classList, 클로저 개념 학습
+
+### 다음에 할 일
+각 화면(`home-screen`, `diet-screen`, `run-screen`, `info-screen`) 안에 실제 콘텐츠 채우기 — 기존 app.js에 있던 BMR 계산기, 소화 타이머, 식단 기록, 러닝 기록, 컨디션 메모 로직을 새 탭 구조에 맞게 옮겨서 재구성할 예정. 특히 소화 타이머(`DigestiveTimer` 클래스)는 홈 화면과 식단 화면 두 군데에 동시에 반영되어야 해서, 상태 공유 방법을 같이 고민하며 진행하기로 함.
