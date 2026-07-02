@@ -11,8 +11,22 @@
     <div class="screens" id="screens">
       <!-- class는 여러개(.),id는 하나(#)  -->
       <div class="screen home-screen">홈 화면</div>
-      <div class="screen diet-screen">식단·타이머 화면</div>
+
+      <div class="screen diet-screen">
+
+        <div id="quick-add-list"></div>
+        <div id="food-list"></div>
+        <div id="total-calorie">오늘 총 섭취: 0 kcal</div>
+        <button id="meal-complete-btn">✅ 식사 완료 → 소화 타이머 시작</button>
+        
+        <div id="digest-timer-box">
+          <div id="digest-timer">--:--:--</div>
+          <div id="digest-warning"></div>
+        </div>
+      </div>
+
       <div class="screen run-screen">러닝 화면</div>
+
       <div class="screen info-screen">내 정보 화면</div>
     </div>
   </div>
