@@ -1,83 +1,39 @@
-// ===== 자주 먹는 음식 데이터 =====
-// 빠른 추가 버튼에 쓰일 음식 목록 (이름 / 칼로리 / 소화시간)
-const foods = [
+// ===== ① 데이터 =====
+
+// 자주 먹는 음식 목록 (이름 / 칼로리 / 소화시간)
+const foods = JSON.parse(localStorage.getItem("foods")) || [
     {이름: "바나나", 칼로리: 100, 소화시간: 2},
     {이름: "닭가슴살", 칼로리: 165, 소화시간: 3},
     {이름: "삼겹살", 칼로리: 330, 소화시간: 4}
 ];
 
-// ===== 오늘 먹은 음식 기록 =====
-// 처음엔 비어있고, 빠른 추가 버튼을 누를 때마다 음식이 하나씩 쌓임
+// 오늘 실제로 먹은 음식 (처음엔 비어있음)
 const todayFoods = [];
 
-// 오늘 먹은 음식 카드들이 그려질 상자 (HTML의 #food-list)
-const foodList = document.getElementById("food-list");
-
-// "식사 완료" 버튼
-const mealCompleteBtn = document.getElementById("meal-complete-btn");
-
-// 지금 실행 중인 타이머의 번호를 기억해두는 변수
-// (여러 번 클릭해도 타이머가 중복 실행되지 않도록 막는 용도)
+// 지금 실행 중인 타이머의 번호 (중복 실행 방지용)
 let timerId = null;
 
-// ===== 소화 타이머 로직 =====
-// "식사 완료" 버튼 클릭 시: 오늘 먹은 음식 중 가장 오래 걸리는 소화시간을 찾아서
-// 그 시간만큼 카운트다운 타이머를 시작함
-mealCompleteBtn.addEventListener("click", function() {
+// 지금 선택된 소화시간 카테고리 값
+let selectedDigest = null;
 
-    // 오늘 먹은 음식들 중 가장 긴 소화시간 찾기
-    let maxTime = 0;
-    todayFoods.forEach(function(food) {
-        if (food.소화시간 > maxTime) {
-            maxTime = food.소화시간;
-        }
-    });
+// 러닝 기록 관련 변수 + 저장 배열
+const runRecords = JSON.parse(localStorage.getItem("runRecords")) || [];
 
-    // 찾은 시간(시간 단위)을 초 단위로 변환
-    let remainingSeconds = maxTime * 3600;
 
-    // 이미 돌아가는 타이머가 있으면 먼저 꺼서, 타이머가 여러 개 겹치지 않게 함
-    if (timerId !== null) {
-        clearInterval(timerId);
-    }
-    
-    // 1초마다 반복 실행되는 카운트다운
-    timerId = setInterval(function() {
-        remainingSeconds -= 1;
+// ===== ② HTML 요소 찾아오기 =====
 
-        // 혹시 마이너스로 내려가면 0으로 보정 (안전장치)
-        if (remainingSeconds < 0) {
-            remainingSeconds = 0;
-        }
+const foodList = document.getElementById("food-list");
+const quickAddList = document.getElementById("quick-add-list");
+const mealCompleteBtn = document.getElementById("meal-complete-btn");
+const addFoodBtn = document.getElementById("add-food-btn");
+const digestButtons = document.querySelectorAll(".digest-btn");
+const runList = document.getElementById("run-list");
+const runSaveBtn = document.getElementById("run-save-btn");
 
-        // 남은 초를 시/분/초로 변환
-        const hours = Math.floor(remainingSeconds / 3600);
-        const minutes = Math.floor((remainingSeconds % 3600) / 60);
-        const seconds = remainingSeconds % 60;
 
-        // 한 자리 숫자는 앞에 0을 붙여 두 자리로 맞춤 (예: 4 → 04)
-        const hh = String(hours).padStart(2, '0');
-        const mm = String(minutes).padStart(2, '0');
-        const ss = String(seconds).padStart(2, '0');
+// ===== ③ 함수 정의 =====
 
-        // 화면에 시:분:초 표시
-        document.getElementById("digest-timer").textContent = `${hh}:${mm}:${ss}`;
-
-        // 시간이 다 됐는지에 따라 타이머 종료 + 안내 문구 전환
-        if (remainingSeconds <= 0) {
-            clearInterval(timerId); // 0에 도달했으니 자기 자신을 멈춤
-            document.getElementById("digest-warning").textContent = "소화 완료! 이제 누우셔도 됩니다!";
-        }
-        else {
-            document.getElementById("digest-warning").textContent = "🙅‍♀️ 아직 눕지 마세요!";
-        }
-        
-    }, 1000);
-});
-
-// ===== 오늘 먹은 음식 목록 화면에 그리기 =====
-// todayFoods 배열이 바뀔 때마다(음식 추가될 때마다) 호출되는 함수
-// 화면을 통째로 비우고, 배열 내용을 처음부터 다시 그려서 항상 최신 상태로 맞춤
+// 오늘 먹은 음식 목록 + 총 칼로리를 화면에 그리는 함수
 function renderFoodList() {
     foodList.innerHTML = ""; // 기존 화면 내용 비우기 (중복 방지)
     let total = 0;
@@ -87,29 +43,205 @@ function renderFoodList() {
         total += food.칼로리; // 칼로리 누적 합산
     });
 
-    // 합산된 총 칼로리를 화면에 표시
     document.getElementById("total-calorie").textContent = `오늘 총 섭취: ${total} kcal`;
 }
 
-// ===== 빠른 추가 버튼 만들기 =====
-// 빠른 추가 버튼들이 들어갈 상자 (HTML의 #quick-add-list)
-const quickAddList = document.getElementById("quick-add-list");
+// 자주 먹는 음식 빠른 추가 버튼 다시 그리기 (삭제 버튼 포함)
+function renderQuickAddList() {
+    quickAddList.innerHTML = "";
 
-// foods 데이터를 기반으로, 음식마다 버튼을 자동으로 하나씩 생성
-foods.forEach(function(food) {
-    const btn = document.createElement("button");
-    btn.textContent = food.이름;
-    quickAddList.appendChild(btn); 
+    foods.forEach(function(food, index) {
+        const btn = document.createElement("button");
+        btn.textContent = food.이름;
+        quickAddList.appendChild(btn);
 
-    // 이 버튼 클릭 시: 이 버튼에 해당하는 음식을 todayFoods에 추가하고 화면 갱신
+        btn.addEventListener("click", function() {
+            todayFoods.push(food);
+            renderFoodList();
+        });
+
+        const deleteBtn = document.createElement("button");
+        deleteBtn.textContent = "❌";
+        quickAddList.appendChild(deleteBtn);
+
+        deleteBtn.addEventListener("click", function() {
+            foods.splice(index, 1);
+            saveFoods();
+            renderQuickAddList();
+        });
+    });
+}
+
+function saveFoods() {
+    localStorage.setItem("foods", JSON.stringify(foods));
+}
+
+//러닝 기록 목록 화면에 그리는 함수
+function renderRunList() {
+    runList.innerHTML = "";
+
+    runRecords.forEach(function(record,index) {
+        const card = document.createElement("div");
+        card.innerHTML = `
+        <div>
+            거리: ${record.거리}km 
+            시간: ${record.시간.toFixed(1)}분 
+            시속: ${record.시속.toFixed(1)}km/h 
+            심박수: ${record.심박수}bpm 
+            칼로리: ${record.칼로리.toFixed(0)}kcal
+        </div>
+        `;
+        runList.appendChild(card);
+
+        const deleteBtn = document.createElement("button");
+        deleteBtn.textContent = "❌";
+        card.appendChild(deleteBtn);
+
+        deleteBtn.addEventListener("click", function() {
+            runRecords.splice(index, 1);
+            saveRunRecords();
+            renderRunList();
+        });
+    });
+}
+
+function saveRunRecords() {
+    localStorage.setItem("runRecords", JSON.stringify(runRecords));
+}
+
+
+// ===== ④ 이벤트 리스너 연결 =====
+
+// "식사 완료" 버튼 클릭 시: 가장 오래 걸리는 소화시간을 찾아서 카운트다운 시작
+mealCompleteBtn.addEventListener("click", function() {
+
+    let maxTime = 0;
+    todayFoods.forEach(function(food) {
+        if (food.소화시간 > maxTime) {
+            maxTime = food.소화시간;
+        }
+    });
+
+    let remainingSeconds = maxTime * 3600;
+
+    if (timerId !== null) {
+        clearInterval(timerId);
+    }
+
+    timerId = setInterval(function() {
+        remainingSeconds -= 1;
+
+        if (remainingSeconds < 0) {
+            remainingSeconds = 0;
+        }
+
+        const hours = Math.floor(remainingSeconds / 3600);
+        const minutes = Math.floor((remainingSeconds % 3600) / 60);
+        const seconds = remainingSeconds % 60;
+
+        const hh = String(hours).padStart(2, '0');
+        const mm = String(minutes).padStart(2, '0');
+        const ss = String(seconds).padStart(2, '0');
+
+        document.getElementById("digest-timer").textContent = `${hh}:${mm}:${ss}`;
+
+        if (remainingSeconds <= 0) {
+            clearInterval(timerId);
+            document.getElementById("digest-warning").textContent = "소화 완료! 이제 누우셔도 됩니다!";
+        }
+        else {
+            document.getElementById("digest-warning").textContent = "🙅‍♀️ 아직 눕지 마세요!";
+        }
+
+    }, 1000);
+});
+
+// 소화시간 카테고리 버튼 클릭 시: 선택 표시 토글 + selectedDigest 값 저장
+digestButtons.forEach(function(btn) {
     btn.addEventListener("click", function() {
-        todayFoods.push(food);
-        renderFoodList();
+        digestButtons.forEach(function(b) {
+            b.classList.remove("selected");
+        });
+        btn.classList.add("selected");
+
+        selectedDigest = Number(btn.dataset.digest);
     });
 });
 
-// ===== 하단 탭바 화면 전환 =====
-// 탭 버튼 클릭 시: 해당 화면으로 슬라이드 이동 + 클릭된 탭에 active 스타일 적용
+// "음식 추가" 버튼 클릭 시: 입력값+선택된 소화시간으로 새 음식을 foods에 추가
+addFoodBtn.addEventListener("click", function() {
+    if (selectedDigest === null) {
+        alert("소화 시간 카테고리를 선택해주세요!");
+        return;
+    }
+
+    const nameValue = document.getElementById("food-name-input").value;
+    const calorieValue = document.getElementById("food-calorie-input").value;
+
+    const newFood = {
+        이름: nameValue,
+        칼로리: Number(calorieValue),
+        소화시간: selectedDigest
+    };
+
+    foods.push(newFood);
+    saveFoods();
+    renderQuickAddList();
+});
+
+runSaveBtn.addEventListener("click", function() {
+    const distance = Number(document.getElementById("run-distance-input").value);
+
+    const timeValue = (document.getElementById("run-time-input").value);
+    const timeParts = timeValue.split(":");
+    const minutes = Number(timeParts[0]);
+    const seconds = Number(timeParts[1]);
+    const totalMinutes = minutes + (seconds / 60);
+
+    const heartrate = Number(document.getElementById("run-heartrate-input").value);
+
+    const speedKmh = distance / (totalMinutes / 60);
+
+    // 시속에 따라 MET(운동 강도) 값 결정
+    // 출처:https://pacompendium.com/running/
+    let met;
+
+    if (speedKmh < 8.05) {
+        met = 6.0;
+    } else if (speedKmh < 9.66) {
+        met = 8.5;
+    } else if (speedKmh < 10.78) {
+        met = 9.3;
+    } else if (speedKmh < 11.27) {
+        met = 10.5;
+    } else if (speedKmh < 12.87) {
+        met = 11.5;
+    } else if (speedKmh < 14.48) {
+        met = 12.3;
+    } else if (speedKmh < 16.09) {
+        met = 12.8;
+    } else {
+        met = 14.5;
+    }
+
+    const tempWeight = 60;
+    // 칼로리 계산: MET * 체중(kg) * 시간
+    const caloriesBurned = met * tempWeight * (totalMinutes / 60);
+
+    const newRecord = {
+        거리: distance,
+        시간: totalMinutes,
+        심박수: heartrate,
+        시속: speedKmh,
+        칼로리: caloriesBurned
+    };
+
+    runRecords.push(newRecord);
+    saveRunRecords();
+    renderRunList();
+});
+
+// 하단 탭 버튼 클릭 시: 해당 화면으로 슬라이드 이동 + 클릭된 탭에 active 스타일 적용
 document.addEventListener('DOMContentLoaded', function() {
     document.querySelectorAll(".tab-btn").forEach(function(btn) {
         btn.addEventListener("click", function() {
@@ -123,4 +255,10 @@ document.addEventListener('DOMContentLoaded', function() {
             btn.classList.add("active");
         });
     });
-}); 
+});
+
+
+// ===== ⑤ 초기 실행 =====
+
+renderQuickAddList();
+renderRunList();

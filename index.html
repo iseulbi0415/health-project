@@ -7,7 +7,8 @@
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-  <div class="screen-wrap">
+  <div class="screen-wrap"> 
+    <!-- screen-wrap은 딱 화면 크기만큼 보여주는 창문틀 -->
     <div class="screens" id="screens">
       <!-- class는 여러개(.),id는 하나(#)  -->
       <div class="screen home-screen">홈 화면</div>
@@ -22,10 +23,38 @@
         <div id="digest-timer-box">
           <div id="digest-timer">--:--:--</div>
           <div id="digest-warning"></div>
+        </div>        
+
+        <div id="custom-food-form">
+            <input type="text" id="food-name-input" placeholder="음식 이름">
+            <input type="number" id="food-calorie-input" placeholder="칼로리">
+
+            <div id="digest-category-buttons">
+              <button type="button" class="digest-btn" data-digest="2">🟢 가벼움</button>
+              <button type="button" class="digest-btn" data-digest="3">🟡 보통</button>
+              <button type="button" class="digest-btn" data-digest="4">🔴 무거움</button>
+          </div>
+
+          <p id="digest-guide-text">
+          💡 지방 함량 기준: 5g↓ 🟢 · 6~15g 🟡 · 16g↑ 🔴<br>
+          예: 🟢바나나·달걀 🟡밥·닭가슴살 🔴튀김·삼겹살
+          </p>
+
+          <button type="button" id="add-food-btn"> ➕ 음식 추가 </button>
         </div>
+
       </div>
 
-      <div class="screen run-screen">러닝 화면</div>
+      <div class="screen run-screen">
+        <div id="run-input-form">
+          <input type="number" id="run-distance-input" placeholder="거리(km)" step="0.01">
+          <input type="text" id="run-time-input" placeholder="시간(예: 30:15)">
+          <input type="number" id="run-heartrate-input" placeholder="심박수(bpm)">
+          <button type="button" id="run-save-btn">🏃‍♂️ 러닝 기록 저장</button>
+        </div>
+
+        <div id="run-list"></div>
+      </div>
 
       <div class="screen info-screen">내 정보 화면</div>
     </div>
