@@ -19,6 +19,12 @@ let selectedDigest = null;
 // 러닝 기록 관련 변수 + 저장 배열
 const runRecords = JSON.parse(localStorage.getItem("runRecords")) || [];
 
+// 성별 선택 관련 변수
+let selectedGender = null;
+
+// 사용자 체중(내 정보 화면에서 입력받은 값)
+let userWeight = Number(localStorage.getItem("userWeight")) || 60; 
+
 
 // ===== ② HTML 요소 찾아오기 =====
 
@@ -29,6 +35,8 @@ const addFoodBtn = document.getElementById("add-food-btn");
 const digestButtons = document.querySelectorAll(".digest-btn");
 const runList = document.getElementById("run-list");
 const runSaveBtn = document.getElementById("run-save-btn");
+const genderButtons = document.querySelectorAll(".gender-btn");
+const infoSaveBtn = document.getElementById("info-save-btn");
 
 
 // ===== ③ 함수 정의 =====
@@ -81,11 +89,16 @@ function renderRunList() {
     runList.innerHTML = "";
 
     runRecords.forEach(function(record,index) {
+
+        const totalMin = Math.floor(record.시간);
+        const totalSec = Math.round((record.시간 - totalMin)*60);
+        const timeDisplay = totalSec > 0 ? `${totalMin}분 ${totalSec}초` : `${totalMin}분`;
+
         const card = document.createElement("div");
         card.innerHTML = `
         <div>
             거리: ${record.거리}km 
-            시간: ${record.시간.toFixed(1)}분 
+            시간: ${timeDisplay}
             시속: ${record.시속.toFixed(1)}km/h 
             심박수: ${record.심박수}bpm 
             칼로리: ${record.칼로리.toFixed(0)}kcal
@@ -109,6 +122,29 @@ function saveRunRecords() {
     localStorage.setItem("runRecords", JSON.stringify(runRecords));
 }
 
+function renderInfo() {
+    const savedWeight = localStorage.getItem("userWeight");
+    const savedHeight = localStorage.getItem("userHeight")
+    const savedAge = localStorage.getItem("userAge");
+    const savedGender = localStorage.getItem("userGender");
+    const savedBmr = localStorage.getItem("bmr");
+
+    if (savedWeight) document.getElementById("info-weight-input").value = savedWeight;
+    if (savedHeight) document.getElementById("info-height-input").value = savedHeight;
+    if (savedAge) document.getElementById("info-age-input").value = savedAge;
+
+    if (savedGender) {
+        selectedGender = savedGender;
+        genderButtons.forEach(function(b){
+            if(b.dataset.gender === savedGender){
+                b.classList.add("selected");
+            }
+        });
+    }
+    if (savedBmr) {
+        document.getElementById("bmr-result").textContent = `기초대사량(BMR): ${savedBmr} kcal`;
+    }
+}
 
 // ===== ④ 이벤트 리스너 연결 =====
 
@@ -195,7 +231,7 @@ runSaveBtn.addEventListener("click", function() {
     const timeValue = (document.getElementById("run-time-input").value);
     const timeParts = timeValue.split(":");
     const minutes = Number(timeParts[0]);
-    const seconds = Number(timeParts[1]);
+    const seconds = Number(timeParts[1]) || 0;
     const totalMinutes = minutes + (seconds / 60);
 
     const heartrate = Number(document.getElementById("run-heartrate-input").value);
@@ -224,9 +260,8 @@ runSaveBtn.addEventListener("click", function() {
         met = 14.5;
     }
 
-    const tempWeight = 60;
     // 칼로리 계산: MET * 체중(kg) * 시간
-    const caloriesBurned = met * tempWeight * (totalMinutes / 60);
+    const caloriesBurned = met * userWeight * (totalMinutes / 60);
 
     const newRecord = {
         거리: distance,
@@ -241,6 +276,48 @@ runSaveBtn.addEventListener("click", function() {
     renderRunList();
 });
 
+// 성별 버튼 클릭 시: 선택 표시 토글 + selectedGender 값 저장
+genderButtons.forEach(function(btn) {
+    btn.addEventListener("click", function() {
+        genderButtons.forEach(function(b) {
+            b.classList.remove("selected");
+        });
+        btn.classList.add("selected");
+
+        selectedGender = btn.dataset.gender;
+    });
+});
+
+// "정보 저장" 버튼 클릭 시: 입력값으로 BMR 계산
+// 공식 출처: Mifflin-St Jeor Equation (1990) — 미국 영양학회(Academy of Nutrition and Dietetics) 권장 공식
+infoSaveBtn.addEventListener("click", function() {
+    if (selectedGender === null) {
+        alert("성별을 선택해주세요!");
+        return;
+    }
+
+
+    const age = Number(document.getElementById("info-age-input").value);
+    const height = Number(document.getElementById("info-height-input").value);
+    const weight = Number(document.getElementById("info-weight-input").value);
+
+    let bmr;
+    if (selectedGender === "male") {
+        bmr = (10 * weight) + (6.25 * height) - (5 * age) + 5;
+    }
+    else {
+        bmr = (10 * weight) + (6.25 * height) - (5 * age) - 161;
+    }
+
+    document.getElementById("bmr-result").textContent = `기초대사량(BMR): ${bmr.toFixed(0)} kcal`;
+
+    userWeight = weight;
+    localStorage.setItem("userWeight", userWeight);
+    localStorage.setItem("userHeight", height);
+    localStorage.setItem("userAge", age);
+    localStorage.setItem("userGender", selectedGender);
+    localStorage.setItem("bmr", bmr.toFixed(0));
+});
 // 하단 탭 버튼 클릭 시: 해당 화면으로 슬라이드 이동 + 클릭된 탭에 active 스타일 적용
 document.addEventListener('DOMContentLoaded', function() {
     document.querySelectorAll(".tab-btn").forEach(function(btn) {
@@ -259,6 +336,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
 
 // ===== ⑤ 초기 실행 =====
-
 renderQuickAddList();
 renderRunList();
+renderInfo();
