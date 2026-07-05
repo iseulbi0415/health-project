@@ -25,6 +25,9 @@ let selectedGender = null;
 // 사용자 체중(내 정보 화면에서 입력받은 값)
 let userWeight = Number(localStorage.getItem("userWeight")) || 60; 
 
+// 컨디션 메모 기록 (날짜별로 쌓임)
+const memoRecords = JSON.parse(localStorage.getItem("memoRecords")) || [];
+
 
 // ===== ② HTML 요소 찾아오기 =====
 
@@ -37,6 +40,9 @@ const runList = document.getElementById("run-list");
 const runSaveBtn = document.getElementById("run-save-btn");
 const genderButtons = document.querySelectorAll(".gender-btn");
 const infoSaveBtn = document.getElementById("info-save-btn");
+const memoInput = document.getElementById("condition-memo-input");
+const memoSaveBtn = document.getElementById("memo-save-btn");
+const memoList = document.getElementById("memo-list");
 
 
 // ===== ③ 함수 정의 =====
@@ -144,6 +150,26 @@ function renderInfo() {
     if (savedBmr) {
         document.getElementById("bmr-result").textContent = `기초대사량(BMR): ${savedBmr} kcal`;
     }
+}
+
+function renderMemoList() {
+    memoList.innerHTML = "";
+
+    memoRecords.forEach(function(memo, index) {
+        const card = document.createElement("div");
+        card.innerHTML = `<strong>${memo.날짜}</strong><br>${memo.내용}`;
+        memoList.appendChild(card);
+
+        const deleteBtn = document.createElement("button");
+        deleteBtn.textContent = "❌";
+        card.appendChild(deleteBtn);
+
+        deleteBtn.addEventListener("click", function() {
+            memoRecords.splice(index, 1);
+            localStorage.setItem("memoRecords", JSON.stringify(memoRecords));
+            renderMemoList();
+        });
+    });
 }
 
 // ===== ④ 이벤트 리스너 연결 =====
@@ -318,6 +344,26 @@ infoSaveBtn.addEventListener("click", function() {
     localStorage.setItem("userGender", selectedGender);
     localStorage.setItem("bmr", bmr.toFixed(0));
 });
+
+memoSaveBtn.addEventListener("click", function() {
+    if (!memoInput.value){
+        alert("메모를 작성해주세요!");
+        return;
+    }
+    
+    const today = new Date();
+    const dateString = today.toLocaleDateString("Ko-KR");
+
+    const newMemo = {
+        날짜: dateString,
+        내용: memoInput.value
+    };
+
+    memoRecords.push(newMemo);
+    localStorage.setItem("memoRecords", JSON.stringify(memoRecords));
+    memoInput.value = "";
+    renderMemoList();
+});
 // 하단 탭 버튼 클릭 시: 해당 화면으로 슬라이드 이동 + 클릭된 탭에 active 스타일 적용
 document.addEventListener('DOMContentLoaded', function() {
     document.querySelectorAll(".tab-btn").forEach(function(btn) {
@@ -339,3 +385,4 @@ document.addEventListener('DOMContentLoaded', function() {
 renderQuickAddList();
 renderRunList();
 renderInfo();
+renderMemoList();
