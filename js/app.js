@@ -28,6 +28,8 @@ let userWeight = Number(localStorage.getItem("userWeight")) || 60;
 // 컨디션 메모 기록 (날짜별로 쌓임)
 const memoRecords = JSON.parse(localStorage.getItem("memoRecords")) || [];
 
+// 선택된 활동량 계수의 값 
+let selectedActivity = null;
 
 // ===== ② HTML 요소 찾아오기 =====
 
@@ -43,7 +45,7 @@ const infoSaveBtn = document.getElementById("info-save-btn");
 const memoInput = document.getElementById("condition-memo-input");
 const memoSaveBtn = document.getElementById("memo-save-btn");
 const memoList = document.getElementById("memo-list");
-
+const activityButtons = document.querySelectorAll(".activity-btn");
 
 // ===== ③ 함수 정의 =====
 
@@ -134,6 +136,9 @@ function renderInfo() {
     const savedAge = localStorage.getItem("userAge");
     const savedGender = localStorage.getItem("userGender");
     const savedBmr = localStorage.getItem("bmr");
+    const savedActivity = localStorage.getItem("userActivity");
+    const savedTdee = localStorage.getItem("tdee");
+    const savedBulk = localStorage.getItem("bulkTarget");
 
     if (savedWeight) document.getElementById("info-weight-input").value = savedWeight;
     if (savedHeight) document.getElementById("info-height-input").value = savedHeight;
@@ -142,13 +147,26 @@ function renderInfo() {
     if (savedGender) {
         selectedGender = savedGender;
         genderButtons.forEach(function(b){
-            if(b.dataset.gender === savedGender){
+            if (b.dataset.gender === savedGender){
                 b.classList.add("selected");
             }
         });
     }
-    if (savedBmr) {
-        document.getElementById("bmr-result").textContent = `기초대사량(BMR): ${savedBmr} kcal`;
+    
+    if (savedActivity) {
+        selectedActivity = Number(savedActivity);
+        activityButtons.forEach(function(b){
+            if (b.dataset.activity === savedActivity){
+                b.classList.add("selected");
+            }
+        });
+    }
+    if (savedBmr && savedTdee && savedBulk) {
+        document.getElementById("bmr-result").innerHTML = `
+        기초대사량(BMR): ${savedBmr} kcal<br>
+        유지 칼로리: ${savedTdee} kcal<br>
+        증량 목표: ${savedBulk} kcal
+        `;
     }
 }
 
@@ -314,11 +332,40 @@ genderButtons.forEach(function(btn) {
     });
 });
 
+// 활동량 버튼 클릭 시: 선택 표시 토글 + selectedActivity 값 저장
+activityButtons.forEach(function(btn) {
+    btn.addEventListener("click", function() {
+        activityButtons.forEach(function(b) {
+            b.classList.remove("selected");
+        });
+        btn.classList.add("selected");
+        selectedActivity = Number(btn.dataset.activity);
+    });
+});    
+
+
 // "정보 저장" 버튼 클릭 시: 입력값으로 BMR 계산
 // 공식 출처: Mifflin-St Jeor Equation (1990) — 미국 영양학회(Academy of Nutrition and Dietetics) 권장 공식
+// 출처: TDEE = BMR × 활동계수(1.2~1.9), 증량은 TDEE+300~500kcal (일반적으로 권장되는 범위)
 infoSaveBtn.addEventListener("click", function() {
+    if (!document.getElementById("info-weight-input").value) {
+        alert("체중을 입력해주세요!");
+        return;
+    }
+    if (!document.getElementById("info-height-input").value) {
+        alert("키를 입력해주세요!");
+        return;
+    }
+    if (!document.getElementById("info-age-input").value) {
+        alert("나이를 입력해주세요!");
+        return;
+    }
     if (selectedGender === null) {
         alert("성별을 선택해주세요!");
+        return;
+    }
+    if (selectedActivity === null) {
+        alert("활동량을 선택해주세요!");
         return;
     }
 
@@ -335,14 +382,24 @@ infoSaveBtn.addEventListener("click", function() {
         bmr = (10 * weight) + (6.25 * height) - (5 * age) - 161;
     }
 
-    document.getElementById("bmr-result").textContent = `기초대사량(BMR): ${bmr.toFixed(0)} kcal`;
+    const tdee = bmr * selectedActivity;
+    const bulkTarget = tdee + 400;
 
     userWeight = weight;
     localStorage.setItem("userWeight", userWeight);
     localStorage.setItem("userHeight", height);
     localStorage.setItem("userAge", age);
     localStorage.setItem("userGender", selectedGender);
+    localStorage.setItem("userActivity", selectedActivity)
     localStorage.setItem("bmr", bmr.toFixed(0));
+    localStorage.setItem("tdee", tdee.toFixed(0));
+    localStorage.setItem("bulkTarget", bulkTarget.toFixed(0));
+
+    document.getElementById("bmr-result").innerHTML = `
+    기초대사량(BMR): ${bmr.toFixed(0)} kcal<br>
+    유지 칼로리: ${tdee.toFixed(0)} kcal<br>
+    증량 목표: ${bulkTarget.toFixed(0)} kcal
+    `;
 });
 
 memoSaveBtn.addEventListener("click", function() {
