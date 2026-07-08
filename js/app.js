@@ -38,6 +38,7 @@ const quickAddList = document.getElementById("quick-add-list");
 const mealCompleteBtn = document.getElementById("meal-complete-btn");
 const addFoodBtn = document.getElementById("add-food-btn");
 const digestButtons = document.querySelectorAll(".digest-btn");
+const digestCancelBtn = document.getElementById("digest-cancel-btn");
 const runList = document.getElementById("run-list");
 const runSaveBtn = document.getElementById("run-save-btn");
 const genderButtons = document.querySelectorAll(".gender-btn");
@@ -60,6 +61,13 @@ function renderFoodList() {
     });
 
     document.getElementById("total-calorie").textContent = `오늘 총 섭취: ${total} kcal`;
+    const goalCalorie = localStorage.getItem("tdee");
+    if (goalCalorie) {
+        document.getElementById("home-calorie-value").textContent = `${total} / ${goalCalorie} kcal`;
+    }
+    else {
+        document.getElementById("home-calorie-value").textContent = `${total} kcal`;
+    }
 }
 
 // 자주 먹는 음식 빠른 추가 버튼 다시 그리기 (삭제 버튼 포함)
@@ -92,6 +100,45 @@ function saveFoods() {
     localStorage.setItem("foods", JSON.stringify(foods));
 }
 
+//소화 타이머 시작(또는 재개) - 넘겨받은 초부터 카운트다운
+function startDigestTimer(startSeconds) {
+    let remainingSeconds = startSeconds;
+
+    if (timerId !== null) {
+        clearInterval(timerId);
+    }
+
+    timerId = setInterval(function() {
+        remainingSeconds -= 1;
+
+        if(remainingSeconds < 0) {
+            remainingSeconds = 0;
+        }
+
+        const hours = Math.floor(remainingSeconds / 3600);
+        const minutes = Math.floor((remainingSeconds % 3600) / 60);
+        const seconds = remainingSeconds % 60;
+
+        const hh = String(hours).padStart(2, '0');
+        const mm = String(minutes).padStart(2, '0');
+        const ss = String(seconds).padStart(2, '0');
+
+        document.getElementById("digest-timer").textContent = `${hh}:${mm}:${ss}`;
+        document.getElementById("home-digest-timer").textContent = `${hh}:${mm}:${ss}`;
+
+        if (remainingSeconds <= 0) {
+            clearInterval(timerId);
+            localStorage.removeItem("digestEndTime");
+            document.getElementById("digest-warning").textContent = "소화 완료! 이제 누우셔도 됩니다!";
+            document.getElementById("home-digest-warning").textContent = "소화 완료! 이제 누우셔도 됩니다!";
+        }
+        else {
+            document.getElementById("digest-warning").textContent = "🙅‍♀️ 아직 눕지 마세요!";
+            document.getElementById("home-digest-warning").textContent = "🙅‍♀️ 아직 눕지 마세요!";
+        }
+    }, 1000);
+}
+
 //러닝 기록 목록 화면에 그리는 함수
 function renderRunList() {
     runList.innerHTML = "";
@@ -102,11 +149,17 @@ function renderRunList() {
         const totalSec = Math.round((record.시간 - totalMin)*60);
         const timeDisplay = totalSec > 0 ? `${totalMin}분 ${totalSec}초` : `${totalMin}분`;
 
+        const paceTotalSec = Math.round((record.시간 / record.거리) * 60);
+        const paceMin = Math.floor(paceTotalSec / 60);
+        const paceSec = paceTotalSec % 60;
+        const paceDisplay = `${paceMin}'${String(paceSec).padStart(2, '0')}"`;
+
         const card = document.createElement("div");
         card.innerHTML = `
         <div>
             거리: ${record.거리}km 
             시간: ${timeDisplay}
+            페이스: ${paceDisplay}/km
             시속: ${record.시속.toFixed(1)}km/h 
             심박수: ${record.심박수}bpm 
             칼로리: ${record.칼로리.toFixed(0)}kcal
@@ -124,6 +177,23 @@ function renderRunList() {
             renderRunList();
         });
     });
+
+    if (runRecords.length > 0) {
+        const latest = runRecords[runRecords.length - 1];
+        const latestMin = Math.floor(latest.시간);
+        const latestSec = Math.round((latest.시간 - latestMin) * 60);
+        const latestTimeDisplay = latestSec > 0 ? `${latestMin}분 ${latestSec}초` : `${latestMin}분`;
+        
+        const paceTotalSec = Math.round((latest.시간 / latest.거리) * 60);
+        const paceMin = Math.floor(paceTotalSec / 60);
+        const paceSec = paceTotalSec % 60;
+        const paceDisplay = `${paceMin}'${String(paceSec).padStart(2, '0')}"`;
+
+        document.getElementById("home-run-value").textContent = `${latest.거리}km / ${latestTimeDisplay} / 페이스 ${paceDisplay}/km`;
+    }
+    else {
+        document.getElementById("home-run-value").textContent = "아직 기록 없음";
+    }
 }
 
 function saveRunRecords() {
@@ -192,7 +262,7 @@ function renderMemoList() {
 
 // ===== ④ 이벤트 리스너 연결 =====
 
-// "식사 완료" 버튼 클릭 시: 가장 오래 걸리는 소화시간을 찾아서 카운트다운 시작
+// "식사 완료" 버튼 클릭 시: 가장 오래 걸리는 소화시간을 찾아서 끝나는 시각을 저장하고 타이머 시작
 mealCompleteBtn.addEventListener("click", function() {
 
     let maxTime = 0;
@@ -201,39 +271,26 @@ mealCompleteBtn.addEventListener("click", function() {
             maxTime = food.소화시간;
         }
     });
+    
+    const totalSeconds = maxTime * 3600;
+    const endTime = Date.now() + (totalSeconds * 1000); 
+    localStorage.setItem("digestEndTime", endTime);
 
-    let remainingSeconds = maxTime * 3600;
+    startDigestTimer(totalSeconds);
 
+});
+
+// "타이머 취소" 버튼 클릭 시: 타이머 정지 + 저장된 끝나는 시각 삭제 + 화면 초기화
+digestCancelBtn.addEventListener("click", function() {
     if (timerId !== null) {
         clearInterval(timerId);
+        timerId = null;
     }
-
-    timerId = setInterval(function() {
-        remainingSeconds -= 1;
-
-        if (remainingSeconds < 0) {
-            remainingSeconds = 0;
-        }
-
-        const hours = Math.floor(remainingSeconds / 3600);
-        const minutes = Math.floor((remainingSeconds % 3600) / 60);
-        const seconds = remainingSeconds % 60;
-
-        const hh = String(hours).padStart(2, '0');
-        const mm = String(minutes).padStart(2, '0');
-        const ss = String(seconds).padStart(2, '0');
-
-        document.getElementById("digest-timer").textContent = `${hh}:${mm}:${ss}`;
-
-        if (remainingSeconds <= 0) {
-            clearInterval(timerId);
-            document.getElementById("digest-warning").textContent = "소화 완료! 이제 누우셔도 됩니다!";
-        }
-        else {
-            document.getElementById("digest-warning").textContent = "🙅‍♀️ 아직 눕지 마세요!";
-        }
-
-    }, 1000);
+    localStorage.removeItem("digestEndTime");
+    document.getElementById("digest-timer").textContent = "--:--:--";
+    document.getElementById("home-digest-timer").textContent = "--:--:--";
+    document.getElementById("digest-warning").textContent = "";
+    document.getElementById("home-digest-warning").textContent = "";
 });
 
 // 소화시간 카테고리 버튼 클릭 시: 선택 표시 토글 + selectedDigest 값 저장
@@ -400,6 +457,8 @@ infoSaveBtn.addEventListener("click", function() {
     유지 칼로리: ${tdee.toFixed(0)} kcal<br>
     증량 목표: ${bulkTarget.toFixed(0)} kcal
     `;
+
+    renderFoodList();
 });
 
 memoSaveBtn.addEventListener("click", function() {
@@ -409,7 +468,7 @@ memoSaveBtn.addEventListener("click", function() {
     }
     
     const today = new Date();
-    const dateString = today.toLocaleDateString("Ko-KR");
+    const dateString = today.toLocaleDateString("ko-KR");
 
     const newMemo = {
         날짜: dateString,
@@ -440,6 +499,21 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // ===== ⑤ 초기 실행 =====
 renderQuickAddList();
+renderFoodList();
 renderRunList();
 renderInfo();
 renderMemoList();
+
+// 페이지 열릴때: 저장된 소화 타이머가 있으면 남은 시간을 계산해서 이어서 시작
+const savedEndTime = localStorage.getItem("digestEndTime");
+if (savedEndTime) {
+    const remaining = Math.round((Number(savedEndTime) - Date.now()) / 1000);
+    if (remaining > 0) {
+        startDigestTimer(remaining);
+    }
+    else {
+        localStorage.removeItem("digestEndTime");
+        document.getElementById("digest-warning").textContent = "소화 완료! 이제 누우셔도 됩니다!";
+        document.getElementById("home-digest-warning").textContent = "소화 완료! 이제 누우셔도 됩니다!";
+    }
+}

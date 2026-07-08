@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ko">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Document</title>
+  <title>건강 케어 & 러닝 트래커</title>
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -11,7 +11,25 @@
     <!-- screen-wrap은 딱 화면 크기만큼 보여주는 창문틀 -->
     <div class="screens" id="screens">
       <!-- class는 여러개(.),id는 하나(#)  -->
-      <div class="screen home-screen">홈 화면</div>
+      <div class="screen home-screen">
+
+        <div id="home-digest-box">
+          <div id="home-digest-title">🔥 소화 타이머</div>
+          <div id="home-digest-timer">--:--:--</div>
+          <div id="home-digest-warning"></div>
+        </div>
+
+        <div id="home-calorie-box">
+          <div id="home-calorie-title">🥗 오늘 칼로리</div>
+          <div id="home-calorie-value"></div>
+        </div>
+
+        <div id="home-run-box">
+          <div id="home-run-title">👟 최근 러닝</div>
+          <div id="home-run-value"></div>
+        </div>
+
+      </div>
 
       <div class="screen diet-screen">
 
@@ -23,6 +41,7 @@
         <div id="digest-timer-box">
           <div id="digest-timer">--:--:--</div>
           <div id="digest-warning"></div>
+          <button type="button" id="digest-cancel-btn">타이머 취소</button>
         </div>        
 
         <div id="custom-food-form">
@@ -69,7 +88,7 @@
 
           <div id="activity-buttons">
             <button type="button" class="activity-btn" data-activity="1.2">거의 안움직임</button>
-            <button type="button" class="activity-btn" data-activity="1.37">가벼운 활동</button>
+            <button type="button" class="activity-btn" data-activity="1.375">가벼운 활동</button>
             <button type="button" class="activity-btn" data-activity="1.55">보통 활동</button>
             <button type="button" class="activity-btn" data-activity="1.725">활발한 활동</button>
           </div>
