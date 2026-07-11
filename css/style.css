@@ -1,3 +1,48 @@
+* {
+  box-sizing: border-box;
+}
+
+/* ===== 색상 변수 ===== */
+:root {
+  --blue: #3a7bd5;
+  --green: #2ecc71;
+  --orange: #e8734a;
+  --purple: #7c4dcc;
+  --text-dark: #1a2332;
+  --text-gray: #6b7c93;
+}
+
+/* ===== 전체 배경 ===== */
+body {
+  margin: 0;
+  background: linear-gradient(135deg, #e6eefb 0%, #f0f4f8 100%);
+  font-family: -apple-system, 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif;
+}
+
+/* ===== 글래스모피즘 카드 (모든 화면 공통으로 재사용) ===== */
+.hcard {
+  background: rgba(255,255,255,0.72);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border-radius: 18px;
+  padding: 16px;
+  margin: 12px;
+  border: 1px solid rgba(255,255,255,0.85);
+  box-shadow: 0 8px 24px rgba(58,123,213,0.14);
+}
+
+/* ===== 화면 상단 헤더 (화면마다 색만 다르게) ===== */
+.screen-header {
+  color: white;
+  padding: 20px 20px 30px;
+}
+.screen-header.blue   { background: linear-gradient(135deg, #2c5fb3, var(--blue)); }
+.screen-header.green  { background: linear-gradient(135deg, #1a7a45, var(--green)); }
+.screen-header.orange { background: linear-gradient(135deg, #c05a2a, var(--orange)); }
+.screen-header.purple { background: linear-gradient(135deg, #4c2a8a, var(--purple)); }
+.screen-header-title { font-size: 18px; font-weight: 700; }
+.screen-header-sub { font-size: 12px; opacity: 0.85; margin-top: 4px; }
+
 /* ===== 화면 전환 슬라이드 구조 =====
    - screen-wrap: 창문 틀 역할. overflow:hidden으로
      틀 밖으로 삐져나온 화면은 안 보이게 자름
@@ -42,42 +87,279 @@
 
 .tabbar {
   position: fixed;
-  /* 스크롤을 내려도 항상 화면의 같은 자리에 고정됨 */
-
   bottom: 0;
   left: 0;
   width: 100%;
-  /* 화면 맨 아래, 가로 전체 폭에 딱 붙임 */
-
   display: flex;
-  /* 버튼 4개를 가로로 나란히 배치 */
-
   justify-content: space-around;
-  /* 버튼들 사이 간격을 균등하게 띄움 */
-
-  background: white;
-  padding: 10px 0;
-  /* 배경색과 위아래 여백 */
+  background: rgba(255,255,255,0.6);
+  backdrop-filter: blur(28px) saturate(1.6);
+  -webkit-backdrop-filter: blur(28px) saturate(1.6);
+  border-top: 1px solid rgba(255,255,255,0.75);
+  padding: 10px 0 18px;
 }
 
 .tab-btn {
   flex: 1;
-  /* 버튼 4개가 탭바 가로 폭을 똑같이 나눠가짐 */
-
   background: none;
   border: none;
-  /* 버튼 기본 테두리/배경 제거 (밋밋한 흰 배경으로) */
-
   font-size: 0.75rem;
   color: #9aabbb;
-  /* 기본(선택 안 된) 상태는 흐린 회색 글씨 */
-
   cursor: pointer;
-  /* 마우스를 올리면 손가락 모양 커서로 바뀜 → 클릭 가능함을 알려줌 */
+  transition: transform 0.2s, color 0.2s;
 }
 
 .tab-btn.active {
-  color: #3a7bd5;
+  color: var(--blue);
   font-weight: 700;
-  /* 선택된 버튼만 파란색 + 굵은 글씨로 강조 */
+  transform: scale(1.1);
+}
+
+/* ===== 홈 화면 ===== */
+.home-screen {
+  padding-top: 16px;
+  padding-bottom: 80px; /* 하단 탭바에 안 가리도록 여백 확보 */
+}
+
+.hcard-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-dark);
+  margin-bottom: 10px;
+}
+
+.big-timer {
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--blue);
+  text-align: center;
+  letter-spacing: 2px;
+}
+
+.end-time-text {
+  text-align: center;
+  font-size: 12px;
+  color: var(--text-gray);
+  margin-top: 4px;
+}
+
+.warn-text {
+  background: rgba(231,76,60,0.1);
+  border: 1px solid rgba(231,76,60,0.22);
+  border-radius: 9px;
+  padding: 8px 12px;
+  font-size: 12px;
+  color: #d6493b;
+  margin-top: 10px;
+  text-align: center;
+}
+.warn-text:empty { display: none; }
+
+.calorie-value {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--orange);
+}
+
+.run-value {
+  font-size: 14px;
+  color: var(--text-dark);
+}
+
+/* ===== 식단 화면 ===== */
+.diet-screen {
+  padding: 16px;
+  padding-bottom: 80px;
+}
+
+.quick-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.quick-row button {
+  background: rgba(46,204,113,0.13);
+  border: 1px solid rgba(46,204,113,0.28);
+  border-radius: 99px;
+  padding: 6px 14px;
+  font-size: 13px;
+  color: #1a7a45;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.food-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+.food-list div {
+  background: rgba(255,255,255,0.65);
+  border-radius: 10px;
+  padding: 10px 14px;
+  border: 1px solid rgba(255,255,255,0.8);
+}
+
+.total-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: rgba(255,255,255,0.7);
+  border-radius: 12px;
+  font-weight: 700;
+  color: var(--orange);
+  margin-bottom: 12px;
+}
+
+.btn-meal {
+  background: linear-gradient(120deg, var(--green), #27ae60);
+  color: white;
+  border: none;
+  border-radius: 13px;
+  padding: 14px;
+  font-size: 15px;
+  font-weight: 700;
+  width: 100%;
+  cursor: pointer;
+  margin-bottom: 16px;
+  transition: transform 0.15s;
+}
+.btn-meal:active { transform: scale(0.97); }
+
+.digest-timer-text {
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--blue);
+  text-align: center;
+  letter-spacing: 1.5px;
+}
+
+.btn-cancel {
+  background: none;
+  border: 1px solid var(--text-gray);
+  border-radius: 10px;
+  padding: 8px;
+  width: 100%;
+  color: var(--text-gray);
+  margin-top: 10px;
+  cursor: pointer;
+}
+
+.inp {
+  width: 100%;
+  background: rgba(255,255,255,0.75);
+  border: 1px solid rgba(200,215,230,0.85);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 14px;
+  margin-bottom: 8px;
+  box-sizing: border-box;
+}
+
+.digest-buttons-row {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.digest-buttons-row button {
+  flex: 1;
+  padding: 8px;
+  border-radius: 10px;
+  border: 1px solid rgba(200,215,230,0.85);
+  background: white;
+  cursor: pointer;
+}
+.digest-buttons-row button.selected {
+  border-color: var(--blue);
+  background: rgba(58,123,213,0.1);
+  font-weight: 700;
+}
+
+.guide-text {
+  font-size: 11px;
+  color: var(--text-gray);
+  margin-bottom: 10px;
+  line-height: 1.5;
+}
+
+.btn-add {
+  background: linear-gradient(120deg, var(--green), #27ae60);
+  color: white;
+  border: none;
+  border-radius: 12px;
+  padding: 10px;
+  width: 100%;
+  cursor: pointer;
+}
+
+/* ===== 러닝 화면 ===== */
+.run-screen {
+  padding: 16px;
+  padding-bottom: 80px;
+}
+
+.btn-run {
+  background: linear-gradient(120deg, var(--orange), #d05a30);
+  color: white;
+  border: none;
+  border-radius: 12px;
+  padding: 12px;
+  font-size: 14px;
+  font-weight: 700;
+  width: 100%;
+  cursor: pointer;
+  transition: transform 0.15s;
+}
+.btn-run:active { transform: scale(0.97); }
+
+.run-list-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+/* 러닝 기록 카드 — JS가 만드는 div라 class가 없어서, "위치"로 선택 */
+#run-list > div {
+  background: rgba(255,255,255,0.65);
+  border-radius: 14px;
+  padding: 14px 16px;
+  border: 1px solid rgba(255,255,255,0.8);
+  position: relative;
+}
+
+#run-list button {
+  margin-top: 8px;
+  background: none;
+  border: none;
+  color: #d6493b;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.rc-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.rc-stat {
+  text-align: center;
+  background: rgba(240,244,248,0.7);
+  border-radius: 11px;
+  padding: 10px 4px;
+}
+
+.rc-val {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--orange);
+}
+
+.rc-lbl {
+  font-size: 11px;
+  color: var(--text-gray);
+  margin-top: 3px;
 }

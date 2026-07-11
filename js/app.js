@@ -8,13 +8,19 @@ const foods = JSON.parse(localStorage.getItem("foods")) || [
 ];
 
 // 오늘 실제로 먹은 음식 (처음엔 비어있음)
-const todayFoods = [];
+const todayFoods = JSON.parse(localStorage.getItem("todayFoods")) || [];
 
 // 지금 실행 중인 타이머의 번호 (중복 실행 방지용)
 let timerId = null;
 
 // 지금 선택된 소화시간 카테고리 값
 let selectedDigest = null;
+
+// 지금 수정 중인 "오늘 먹은 음식" 번호 (null이면 수정 중 아님)
+let editingTodayIndex = null;
+
+// 지금 전체 편집 모드가 켜져 있는지 (true/false)
+let isEditMode = false;
 
 // 러닝 기록 관련 변수 + 저장 배열
 const runRecords = JSON.parse(localStorage.getItem("runRecords")) || [];
@@ -34,6 +40,7 @@ let selectedActivity = null;
 // ===== ② HTML 요소 찾아오기 =====
 
 const foodList = document.getElementById("food-list");
+const editModeBtn = document.getElementById("edit-mode-btn");
 const quickAddList = document.getElementById("quick-add-list");
 const mealCompleteBtn = document.getElementById("meal-complete-btn");
 const addFoodBtn = document.getElementById("add-food-btn");
@@ -52,12 +59,65 @@ const activityButtons = document.querySelectorAll(".activity-btn");
 
 // 오늘 먹은 음식 목록 + 총 칼로리를 화면에 그리는 함수
 function renderFoodList() {
-    foodList.innerHTML = ""; // 기존 화면 내용 비우기 (중복 방지)
+    foodList.innerHTML = "";
     let total = 0;
 
-    todayFoods.forEach(function(food){
-        foodList.innerHTML += `<div>${food.이름} - ${food.칼로리} kcal</div>`;
-        total += food.칼로리; // 칼로리 누적 합산
+    todayFoods.forEach(function(food, index) {
+        total += food.칼로리;
+
+        const card = document.createElement("div");
+        card.className = "food-card";
+
+        if (editingTodayIndex === index) {
+            // 수정 모드 화면 (이 항목만)
+            card.innerHTML = `
+                <input type="text" class="inp edit-name-input" value="${food.이름}">
+                <input type="number" class="inp edit-calorie-input" value="${food.칼로리}">
+                <button type="button" class="btn-save-small">저장</button>
+                <button type="button" class="btn-cancel-small">취소</button>
+            `;
+            foodList.appendChild(card);
+
+            card.querySelector(".btn-save-small").addEventListener("click", function() {
+                const newName = card.querySelector(".edit-name-input").value;
+                const newCalorie = Number(card.querySelector(".edit-calorie-input").value);
+                todayFoods[index].이름 = newName;
+                todayFoods[index].칼로리 = newCalorie;
+                saveTodayFoods();
+                editingTodayIndex = null;
+                renderFoodList();
+            });
+
+            card.querySelector(".btn-cancel-small").addEventListener("click", function() {
+                editingTodayIndex = null;
+                renderFoodList();
+            });
+
+        } else if (isEditMode) {
+            // 전체 편집 모드: 수정/삭제 버튼이 바로 보임
+            card.innerHTML = `
+                <span class="food-text">${food.이름} - ${food.칼로리} kcal</span>
+                <button type="button" class="btn-edit-item">수정</button>
+                <button type="button" class="btn-delete-item">삭제</button>
+            `;
+            foodList.appendChild(card);
+
+            card.querySelector(".btn-edit-item").addEventListener("click", function() {
+                editingTodayIndex = index;
+                renderFoodList();
+            });
+
+            card.querySelector(".btn-delete-item").addEventListener("click", function() {
+                todayFoods.splice(index, 1);
+                saveTodayFoods();
+                renderFoodList();
+            });
+
+        } else {
+            // 평소 모드: 그냥 보기만
+            card.innerHTML = `<span class="food-text">${food.이름} - ${food.칼로리} kcal</span>`;
+            foodList.appendChild(card);
+        }
     });
 
     document.getElementById("total-calorie").textContent = `오늘 총 섭취: ${total} kcal`;
@@ -80,7 +140,8 @@ function renderQuickAddList() {
         quickAddList.appendChild(btn);
 
         btn.addEventListener("click", function() {
-            todayFoods.push(food);
+            todayFoods.push({...food});
+            saveTodayFoods();
             renderFoodList();
         });
 
@@ -100,8 +161,12 @@ function saveFoods() {
     localStorage.setItem("foods", JSON.stringify(foods));
 }
 
+function saveTodayFoods() {
+    localStorage.setItem("todayFoods", JSON.stringify(todayFoods));
+}
+
 //소화 타이머 시작(또는 재개) - 넘겨받은 초부터 카운트다운
-function startDigestTimer(startSeconds) {
+function startDigestTimer(startSeconds, endTime) {
     let remainingSeconds = startSeconds;
 
     if (timerId !== null) {
@@ -125,6 +190,10 @@ function startDigestTimer(startSeconds) {
 
         document.getElementById("digest-timer").textContent = `${hh}:${mm}:${ss}`;
         document.getElementById("home-digest-timer").textContent = `${hh}:${mm}:${ss}`;
+
+        const endTimeDisplay = new Date(endTime).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
+        document.getElementById("digest-end-time").textContent = `${endTimeDisplay}에 완료`;
+        document.getElementById("home-digest-end-time").textContent = `${endTimeDisplay}에 완료`;
 
         if (remainingSeconds <= 0) {
             clearInterval(timerId);
@@ -156,13 +225,13 @@ function renderRunList() {
 
         const card = document.createElement("div");
         card.innerHTML = `
-        <div>
-            거리: ${record.거리}km 
-            시간: ${timeDisplay}
-            페이스: ${paceDisplay}/km
-            시속: ${record.시속.toFixed(1)}km/h 
-            심박수: ${record.심박수}bpm 
-            칼로리: ${record.칼로리.toFixed(0)}kcal
+        <div class="rc-grid">
+            <div class="rc-stat"><div class="rc-val">${record.거리}km</div><div class="rc-lbl">거리</div></div>
+            <div class="rc-stat"><div class="rc-val">${timeDisplay}</div><div class="rc-lbl">시간</div></div>
+            <div class="rc-stat"><div class="rc-val">${paceDisplay}</div><div class="rc-lbl">페이스</div></div>
+            <div class="rc-stat"><div class="rc-val">${record.시속.toFixed(1)}km/h</div><div class="rc-lbl">시속</div></div>
+            <div class="rc-stat"><div class="rc-val">${record.심박수}bpm</div><div class="rc-lbl">심박수</div></div>
+            <div class="rc-stat"><div class="rc-val">${record.칼로리.toFixed(0)}kcal</div><div class="rc-lbl">칼로리</div></div>
         </div>
         `;
         runList.appendChild(card);
@@ -276,7 +345,7 @@ mealCompleteBtn.addEventListener("click", function() {
     const endTime = Date.now() + (totalSeconds * 1000); 
     localStorage.setItem("digestEndTime", endTime);
 
-    startDigestTimer(totalSeconds);
+    startDigestTimer(totalSeconds, endTime);
 
 });
 
@@ -289,8 +358,18 @@ digestCancelBtn.addEventListener("click", function() {
     localStorage.removeItem("digestEndTime");
     document.getElementById("digest-timer").textContent = "--:--:--";
     document.getElementById("home-digest-timer").textContent = "--:--:--";
+    document.getElementById("digest-end-time").textContent = "";
+    document.getElementById("home-digest-end-time").textContent = "";
     document.getElementById("digest-warning").textContent = "";
     document.getElementById("home-digest-warning").textContent = "";
+});
+
+// "편집" 버튼 클릭 시: 전체 편집 모드 켜고 끄기
+editModeBtn.addEventListener("click", function() {
+    isEditMode = !isEditMode;
+    editModeBtn.textContent = isEditMode ? "완료" : "편집";
+    editingTodayIndex = null;
+    renderFoodList();
 });
 
 // 소화시간 카테고리 버튼 클릭 시: 선택 표시 토글 + selectedDigest 값 저장
@@ -509,7 +588,7 @@ const savedEndTime = localStorage.getItem("digestEndTime");
 if (savedEndTime) {
     const remaining = Math.round((Number(savedEndTime) - Date.now()) / 1000);
     if (remaining > 0) {
-        startDigestTimer(remaining);
+        startDigestTimer(remaining, Number(savedEndTime));
     }
     else {
         localStorage.removeItem("digestEndTime");
