@@ -17,7 +17,22 @@ body {
   margin: 0;
   background: linear-gradient(135deg, #e6eefb 0%, #f0f4f8 100%);
   font-family: -apple-system, 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif;
+  position: relative;
+  overflow-x: hidden;
 }
+
+/* ===== 배경 블러 블롭 (은은한 장식) ===== */
+.blob {
+  position: fixed;
+  border-radius: 50%;
+  filter: blur(60px);
+  opacity: 0.35;
+  z-index: 0;
+  pointer-events: none;
+}
+.blob1 { width: 280px; height: 280px; background: #9cc6f2; top: -60px; left: -80px; }
+.blob2 { width: 240px; height: 240px; background: #a8e6c1; bottom: 120px; right: -70px; }
+.blob3 { width: 200px; height: 200px; background: #f5c79c; bottom: -80px; left: 20%; }
 
 /* ===== 글래스모피즘 카드 (모든 화면 공통으로 재사용) ===== */
 .hcard {
@@ -26,22 +41,52 @@ body {
   -webkit-backdrop-filter: blur(18px);
   border-radius: 18px;
   padding: 16px;
-  margin: 12px;
+  margin: 0 0 14px;
   border: 1px solid rgba(255,255,255,0.85);
   box-shadow: 0 8px 24px rgba(58,123,213,0.14);
+  position: relative;
+}
+
+/* 카드 안에서 소제목처럼 쓰는 라벨 */
+.sec-lbl {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-gray);
+  letter-spacing: 0.3px;
+  margin-bottom: 10px;
 }
 
 /* ===== 화면 상단 헤더 (화면마다 색만 다르게) ===== */
 .screen-header {
   color: white;
-  padding: 20px 20px 30px;
+  padding: 22px 20px 30px;
+  position: relative;
+  overflow: hidden;
+}
+.screen-header::after {
+  content: '';
+  position: absolute;
+  top: -40%;
+  right: -15%;
+  width: 160px;
+  height: 160px;
+  background: radial-gradient(circle, rgba(255,255,255,0.28), transparent 70%);
+  border-radius: 50%;
 }
 .screen-header.blue   { background: linear-gradient(135deg, #2c5fb3, var(--blue)); }
 .screen-header.green  { background: linear-gradient(135deg, #1a7a45, var(--green)); }
 .screen-header.orange { background: linear-gradient(135deg, #c05a2a, var(--orange)); }
 .screen-header.purple { background: linear-gradient(135deg, #4c2a8a, var(--purple)); }
-.screen-header-title { font-size: 18px; font-weight: 700; }
-.screen-header-sub { font-size: 12px; opacity: 0.85; margin-top: 4px; }
+.screen-header-title { font-size: 20px; font-weight: 700; position: relative; }
+.screen-header-sub { font-size: 13px; opacity: 0.85; margin-top: 4px; position: relative; }
+
+/* 헤더 아래, 실제 콘텐츠가 들어가는 영역 */
+.screen-body {
+  padding: 24px 14px 90px;
+  margin-top: -14px;
+  position: relative;
+  z-index: 1;
+}
 
 /* ===== 화면 전환 슬라이드 구조 =====
    - screen-wrap: 창문 틀 역할. overflow:hidden으로
@@ -54,29 +99,23 @@ body {
 .screen-wrap {
   overflow: hidden;
   /* 박스 크기보다 큰 내용물은 잘라서 숨김 → "창문 틀" */
+  position: relative;
+  z-index: 1;
 }
 
 .screens {
   display: flex;
   /* 자식 요소(screen 4개)를 가로로 나란히 줄세움 → "책상" */
-
+  align-items: flex-start;
   transition: transform 0.45s ease;
-  /* transform 값이 바뀔 때 0.45초 동안 부드럽게 애니메이션
-     (JS로 translateX 시킬 때 탁! 이 아니라 스르륵 움직이게 함) */
 }
 
 .screen {
   width: 100vw;
-  /* vw = viewport width(화면 가로폭)의 %.
-     100vw = 화면 가로 전체를 꽉 채움 */
-
   flex-shrink: 0;
-  /* flex 박스 안 자식은 기본적으로 공간 부족하면 줄어듦.
-     0으로 설정해서 4개가 찌그러지지 않고 원래 크기 유지하게 함 */
+  height: 100vh;
+  overflow-y: auto;
 
-  min-height: 100vh;
-  /* vh = viewport height(화면 세로 길이)의 %.
-     최소한 화면 세로 길이만큼은 차지하게 함 */
 }
 
 /* ===== 하단 탭바 =====
@@ -97,13 +136,14 @@ body {
   -webkit-backdrop-filter: blur(28px) saturate(1.6);
   border-top: 1px solid rgba(255,255,255,0.75);
   padding: 10px 0 18px;
+  z-index: 10;
 }
 
 .tab-btn {
   flex: 1;
   background: none;
   border: none;
-  font-size: 0.75rem;
+  font-size: 0.8rem;
   color: #9aabbb;
   cursor: pointer;
   transition: transform 0.2s, color 0.2s;
@@ -116,20 +156,16 @@ body {
 }
 
 /* ===== 홈 화면 ===== */
-.home-screen {
-  padding-top: 16px;
-  padding-bottom: 80px; /* 하단 탭바에 안 가리도록 여백 확보 */
-}
 
 .hcard-title {
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 700;
   color: var(--text-dark);
   margin-bottom: 10px;
 }
 
 .big-timer {
-  font-size: 32px;
+  font-size: 34px;
   font-weight: 700;
   color: var(--blue);
   text-align: center;
@@ -138,7 +174,7 @@ body {
 
 .end-time-text {
   text-align: center;
-  font-size: 12px;
+  font-size: 13px;
   color: var(--text-gray);
   margin-top: 4px;
 }
@@ -148,7 +184,7 @@ body {
   border: 1px solid rgba(231,76,60,0.22);
   border-radius: 9px;
   padding: 8px 12px;
-  font-size: 12px;
+  font-size: 13px;
   color: #d6493b;
   margin-top: 10px;
   text-align: center;
@@ -156,61 +192,150 @@ body {
 .warn-text:empty { display: none; }
 
 .calorie-value {
-  font-size: 20px;
+  font-size: 22px;
   font-weight: 700;
   color: var(--orange);
 }
 
 .run-value {
-  font-size: 14px;
+  font-size: 15px;
   color: var(--text-dark);
 }
 
-/* ===== 식단 화면 ===== */
-.diet-screen {
-  padding: 16px;
-  padding-bottom: 80px;
+/* 소화 타이머 게이지 바 (식단+홈 공통) */
+.gauge-track {
+  background: rgba(170,195,220,0.3);
+  border-radius: 99px;
+  height: 8px;
+  margin: 10px 0 4px;
+  overflow: hidden;
 }
+.gauge-fill {
+  height: 100%;
+  width: 0%;
+  border-radius: 99px;
+  background: linear-gradient(90deg, var(--blue), #6fa8f5);
+  transition: width 0.5s ease;
+}
+.gauge-fill.green {
+  background: linear-gradient(90deg, var(--green), #86dba6);
+}
+
+/* 홈 화면 - 최근 러닝 미니 격자 */
+.mini-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-top: 6px;
+}
+.mini-stat {
+  text-align: center;
+  background: rgba(240,244,248,0.7);
+  border-radius: 10px;
+  padding: 8px 4px;
+}
+.mini-val { font-size: 13px; font-weight: 700; color: var(--orange); }
+.mini-lbl { font-size: 10px; color: var(--text-gray); margin-top: 2px; }
+
+/* ===== 편집 모드 공통 요소 =====
+   식단(자주먹는음식/오늘먹은음식), 러닝, 메모에서 전부 재사용
+*/
+
+.btn-edit-toggle {
+  background: rgba(255,255,255,0.75);
+  border: 1px solid rgba(200,215,230,0.9);
+  border-radius: 10px;
+  padding: 6px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-gray);
+  cursor: pointer;
+  margin-top: 12px;
+  margin-bottom: 12px;
+  transition: transform 0.15s;
+}
+.btn-edit-toggle:active { transform: scale(0.96); }
+
+/* 자주 먹는 음식 / 오늘 먹은 음식 카드 공통 */
+.food-card {
+  background: rgba(255,255,255,0.65);
+  border-radius: 12px;
+  padding: 10px 14px;
+  margin-bottom: 8px;
+  border: 1px solid rgba(255,255,255,0.8);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.food-text {
+  font-size: 14px;
+  color: var(--text-dark);
+  font-weight: 500;
+}
+
+/* 편집모드에서 보이는 수정/삭제 아이콘 버튼 (식단/러닝/메모 공통) */
+.btn-edit-item, .btn-delete-item {
+  border: none;
+  border-radius: 8px;
+  padding: 5px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.btn-edit-item { background: rgba(58,123,213,0.12); color: var(--blue); }
+.btn-delete-item { background: rgba(231,76,60,0.12); color: #d6493b; }
+
+/* 개별 수정 폼의 저장/취소 버튼 (식단/러닝/메모 공통) */
+.btn-save-small, .btn-cancel-small {
+  border: none;
+  border-radius: 9px;
+  padding: 7px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  margin-top: 6px;
+  margin-right: 6px;
+}
+.btn-save-small { background: linear-gradient(120deg, var(--green), #27ae60); color: white; }
+.btn-cancel-small { background: rgba(200,215,230,0.5); color: var(--text-gray); }
+
+/* ===== 식단 화면 ===== */
 
 .quick-row {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  margin-bottom: 12px;
 }
 .quick-row button {
   background: rgba(46,204,113,0.13);
   border: 1px solid rgba(46,204,113,0.28);
   border-radius: 99px;
-  padding: 6px 14px;
-  font-size: 13px;
+  padding: 7px 16px;
+  font-size: 14px;
   color: #1a7a45;
   font-weight: 600;
   cursor: pointer;
+  transition: transform 0.15s;
 }
+.quick-row button:active { transform: scale(0.95); }
 
 .food-list {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  margin-bottom: 12px;
-}
-.food-list div {
-  background: rgba(255,255,255,0.65);
-  border-radius: 10px;
-  padding: 10px 14px;
-  border: 1px solid rgba(255,255,255,0.8);
 }
 
 .total-row {
   display: flex;
   justify-content: space-between;
+  align-items: center;
   padding: 12px 16px;
   background: rgba(255,255,255,0.7);
   border-radius: 12px;
   font-weight: 700;
   color: var(--orange);
-  margin-bottom: 12px;
+  margin-bottom: 14px;
 }
 
 .btn-meal {
@@ -224,81 +349,107 @@ body {
   width: 100%;
   cursor: pointer;
   margin-bottom: 16px;
+  box-shadow: 0 6px 18px rgba(46,204,113,.32);
   transition: transform 0.15s;
 }
 .btn-meal:active { transform: scale(0.97); }
 
 .digest-timer-text {
-  font-size: 26px;
+  font-size: 28px;
   font-weight: 700;
   color: var(--blue);
   text-align: center;
   letter-spacing: 1.5px;
+  margin: 4px 0;
 }
 
 .btn-cancel {
   background: none;
   border: 1px solid var(--text-gray);
   border-radius: 10px;
-  padding: 8px;
+  padding: 9px;
   width: 100%;
   color: var(--text-gray);
   margin-top: 10px;
+  font-size: 13px;
   cursor: pointer;
 }
 
 .inp {
   width: 100%;
-  background: rgba(255,255,255,0.75);
-  border: 1px solid rgba(200,215,230,0.85);
+  background: rgba(255,255,255,0.8);
+  border: 1px solid rgba(200,215,230,0.9);
   border-radius: 10px;
-  padding: 10px 12px;
-  font-size: 14px;
-  margin-bottom: 8px;
-  box-sizing: border-box;
+  padding: 11px 13px;
+  font-size: 15px;
+  margin-bottom: 10px;
+  font-family: inherit;
+  color: var(--text-dark);
 }
+textarea.inp {
+  min-height: 80px;
+  resize: vertical;
+}
+.inp::placeholder { color: #9aabbb; }
 
 .digest-buttons-row {
   display: flex;
   gap: 6px;
-  margin-bottom: 8px;
+  margin-bottom: 10px;
 }
+.digest-buttons-row.wrap { flex-wrap: wrap; }
 .digest-buttons-row button {
   flex: 1;
-  padding: 8px;
+  min-width: 80px;
+  padding: 9px 6px;
   border-radius: 10px;
-  border: 1px solid rgba(200,215,230,0.85);
+  border: 1px solid rgba(200,215,230,0.9);
   background: white;
+  font-size: 13px;
   cursor: pointer;
+  transition: all 0.15s;
 }
 .digest-buttons-row button.selected {
   border-color: var(--blue);
   background: rgba(58,123,213,0.1);
   font-weight: 700;
+  color: var(--blue);
 }
 
 .guide-text {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--text-gray);
   margin-bottom: 10px;
-  line-height: 1.5;
+  line-height: 1.6;
 }
+
+.calorie-link {
+  display: block;
+  font-size: 12px;
+  color: var(--green);
+  text-decoration: none;
+  margin-top: 10px;
+  margin-bottom: 10px;
+  font-weight: 600;
+}
+
 
 .btn-add {
   background: linear-gradient(120deg, var(--green), #27ae60);
   color: white;
   border: none;
   border-radius: 12px;
-  padding: 10px;
+  padding: 11px;
+  font-size: 14px;
+  font-weight: 700;
   width: 100%;
   cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 /* ===== 러닝 화면 ===== */
-.run-screen {
-  padding: 16px;
-  padding-bottom: 80px;
-}
 
 .btn-run {
   background: linear-gradient(120deg, var(--orange), #d05a30);
@@ -310,6 +461,7 @@ body {
   font-weight: 700;
   width: 100%;
   cursor: pointer;
+  box-shadow: 0 6px 18px rgba(232,115,74,.3);
   transition: transform 0.15s;
 }
 .btn-run:active { transform: scale(0.97); }
@@ -318,7 +470,6 @@ body {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  margin-top: 16px;
 }
 
 /* 러닝 기록 카드 — JS가 만드는 div라 class가 없어서, "위치"로 선택 */
@@ -328,15 +479,6 @@ body {
   padding: 14px 16px;
   border: 1px solid rgba(255,255,255,0.8);
   position: relative;
-}
-
-#run-list button {
-  margin-top: 8px;
-  background: none;
-  border: none;
-  color: #d6493b;
-  cursor: pointer;
-  font-size: 13px;
 }
 
 .rc-grid {
@@ -362,4 +504,65 @@ body {
   font-size: 11px;
   color: var(--text-gray);
   margin-top: 3px;
+}
+
+/* 러닝 카드 안의 수정/삭제 버튼 위치 */
+#run-list .btn-edit-item, #run-list .btn-delete-item {
+  margin-top: 10px;
+  margin-right: 6px;
+}
+
+/* ===== 내 정보 화면 ===== */
+
+.btn-save {
+  background: linear-gradient(120deg, var(--purple), #6039b0);
+  color: white;
+  border: none;
+  border-radius: 12px;
+  padding: 12px;
+  font-size: 14px;
+  font-weight: 700;
+  width: 100%;
+  cursor: pointer;
+  box-shadow: 0 6px 18px rgba(124,77,204,.3);
+  transition: transform 0.15s;
+}
+.btn-save:active { transform: scale(0.97); }
+
+.bmr-result-box {
+  font-size: 14px;
+  line-height: 2.1;
+  color: var(--text-dark);
+  font-weight: 600;
+}
+.bmr-result-box:empty { display: none; }
+
+/* 메모 목록 카드 — JS가 만드는 div라 class가 없어서, "위치"로 선택 */
+#memo-list > div {
+  background: rgba(255,255,255,0.65);
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin-top: 10px;
+  border: 1px solid rgba(255,255,255,0.8);
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text-dark);
+}
+#memo-list > div strong {
+  color: var(--purple);
+  font-size: 12px;
+  display: block;
+  margin-bottom: 4px;
+}
+#memo-list button {
+  border: none;
+  border-radius: 8px;
+  padding: 5px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  margin-top: 8px;
+  margin-right: 6px;
+  background: rgba(200,215,230,0.5);
+  color: var(--text-gray);
 }

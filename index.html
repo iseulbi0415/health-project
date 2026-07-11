@@ -7,15 +7,28 @@
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
+
+  <div class="blob blob1"></div>
+  <div class="blob blob2"></div>
+  <div class="blob blob3"></div>
+
   <div class="screen-wrap"> 
     <!-- screen-wrap은 딱 화면 크기만큼 보여주는 창문틀 -->
     <div class="screens" id="screens">
       <!-- class는 여러개(.),id는 하나(#)  -->
       <div class="screen home-screen">
 
+        <div class="screen-header blue">
+          <div class="screen-header-title">🏠 홈</div>
+          <div class="screen-header-sub">오늘의 건강 현황을 한눈에</div>
+        </div>
+
+        <div class="screen-body">
+
         <div id="home-digest-box" class="hcard">
           <div id="home-digest-title" class="hcard-title">🔥 소화 타이머</div>
           <div id="home-digest-timer" class="big-timer">--:--:--</div>
+          <div class="gauge-track"><div id="home-digest-gauge-fill" class="gauge-fill"></div></div>
           <div id="home-digest-end-time" class="end-time-text"></div>
           <div id="home-digest-warning" class="warn-text"></div>
         </div>
@@ -23,6 +36,7 @@
         <div id="home-calorie-box" class="hcard">
           <div id="home-calorie-title" class="hcard-title">🥗 오늘 칼로리</div>
           <div id="home-calorie-value" class="calorie-value"></div>
+          <div class="gauge-track"><div id ="home-calorie-gauge-fill" class="gauge-fill green"></div></div>
         </div>
 
         <div id="home-run-box" class="hcard">
@@ -30,27 +44,49 @@
           <div id="home-run-value" class="run-value"></div>
         </div>
 
+        </div>
       </div>
 
       <div class="screen diet-screen">
 
-        <div id="quick-add-list" class="quick-row"></div>
-        <button type="button" id="edit-mode-btn" class="btn-edit-toggle">편집</button>
-        <div id="food-list" class="food-list"></div>
+        <div class="screen-header green">
+          <div class="screen-header-title">🍽 식단 & 소화 타이머</div>
+          <div class="screen-header-sub">오늘 먹은 것을 기록하고 타이머를 시작하세요</div>
+        </div>
+
+        <div class="screen-body">
+
+        <div class="hcard">
+          <div class="sec-lbl">빠른 추가 — 자주 먹는 음식</div>
+          <button type="button" id="food-edit-mode-btn" class="btn-edit-toggle">편집</button>
+          <div id="quick-add-list" class="quick-row"></div>
+        </div>
+
+        <div class="hcard">
+          <div class="sec-lbl">오늘 먹은 음식</div>
+          <button type="button" id="edit-mode-btn" class="btn-edit-toggle">편집</button>
+          <div id="food-list" class="food-list"></div>
+        </div>
+
         <div id="total-calorie" class="total-row">오늘 총 섭취: 0 kcal</div>
         <button id="meal-complete-btn" class="btn-meal">✅ 식사 완료 → 소화 타이머 시작</button>
         
         <div id="digest-timer-box" class="hcard">
+          <div class="sec-lbl">소화 타이머 현황</div>
           <div id="digest-timer" class="digest-timer-text">--:--:--</div>
+          <div class="gauge-track"><div id="digest-gauge-fill" class="gauge-fill"></div></div>
           <div id="digest-end-time" class="end-time-text"></div>
           <div id="digest-warning" class="warn-text"></div>
           <button type="button" id="digest-cancel-btn" class="btn-cancel">타이머 취소</button>
         </div>        
 
         <div id="custom-food-form" class="hcard">
+            <div class="sec-lbl">음식 직접 추가</div>
             <input type="text" id="food-name-input" class="inp" placeholder="음식 이름">
             <input type="number" id="food-calorie-input" class="inp" placeholder="칼로리">
 
+            <a href="https://www.fatsecret.kr" target="_blank" class="calorie-link">🔍 칼로리 몰라요? FatSecret에서 찾아보기</a>
+            
             <div id="digest-category-buttons" class="digest-buttons-row">
               <button type="button" class="digest-btn" data-digest="2">🟢 가벼움</button>
               <button type="button" class="digest-btn" data-digest="3">🟡 보통</button>
@@ -65,49 +101,76 @@
           <button type="button" id="add-food-btn" class="btn-add"> ➕ 음식 추가 </button>
         </div>
 
+        </div>
       </div>
 
       <div class="screen run-screen">
-        <div id="run-input-form">
-          <input type="number" id="run-distance-input" class="inp" placeholder="거리(km)" step="0.01">
-          <input type="text" id="run-time-input" class="inp" placeholder="시간(예: 30:15)">
-          <input type="number" id="run-heartrate-input" class="inp" placeholder="심박수(bpm)">
-          <button type="button" id="run-save-btn" class="btn-run">🏃‍♂️ 러닝 기록 저장</button>
+
+        <div class="screen-header orange">
+          <div class="screen-header-title">👟 러닝 기록 일지</div>
+          <div class="screen-header-sub">거리, 시간, 페이스를 기록하세요</div>
         </div>
 
+        <div class="screen-body">
+
+        <div class="hcard">
+          <div class="sec-lbl">새 기록 추가</div>
+          <div id="run-input-form">
+            <input type="number" id="run-distance-input" class="inp" placeholder="거리(km)" step="0.01">
+            <input type="text" id="run-time-input" class="inp" placeholder="시간(예: 30:15)">
+            <input type="number" id="run-heartrate-input" class="inp" placeholder="심박수(bpm)">
+            <button type="button" id="run-save-btn" class="btn-run">🏃‍♂️ 러닝 기록 저장</button>
+          </div>
+        </div>
+
+        <button type="button" id="run-edit-mode-btn" class="btn-edit-toggle">편집</button>
         <div id="run-list" class="run-list-wrap"></div>
+
+        </div>
       </div>
 
       <div class="screen info-screen">
-        <div id="info-input-form">
-          <input type="number" id="info-height-input" placeholder="키(cm)">
-          <input type="number" id="info-weight-input" placeholder="체중(kg)">
-          <input type="number" id="info-age-input" placeholder="나이">
 
-          <div id="gender-buttons">
+        <div class="screen-header purple">
+          <div class="screen-header-title">📋 내 정보 & 메모</div>
+          <div class="screen-header-sub">BMR 계산기와 오늘의 컨디션 메모</div>
+        </div>
+
+        <div class="screen-body">
+
+        <div id="info-input-form" class="hcard">
+          <div class="sec-lbl">기본 정보</div>
+          <input type="number" id="info-height-input" class="inp" placeholder="키(cm)">
+          <input type="number" id="info-weight-input" class="inp" placeholder="체중(kg)">
+          <input type="number" id="info-age-input" class="inp" placeholder="나이">
+
+          <div id="gender-buttons" class="digest-buttons-row">
             <button type="button" class="gender-btn" data-gender="male">남성</button>
             <button type="button" class="gender-btn" data-gender="female">여성</button>
           </div>
 
-          <div id="activity-buttons">
+          <div id="activity-buttons" class="digest-buttons-row wrap">
             <button type="button" class="activity-btn" data-activity="1.2">거의 안움직임</button>
             <button type="button" class="activity-btn" data-activity="1.375">가벼운 활동</button>
             <button type="button" class="activity-btn" data-activity="1.55">보통 활동</button>
             <button type="button" class="activity-btn" data-activity="1.725">활발한 활동</button>
           </div>
 
-          <button type="button" id="info-save-btn">💾 정보 저장</button>
+          <button type="button" id="info-save-btn" class="btn-save">💾 정보 저장</button>
         </div> 
 
-        <div id="bmr-result"></div>
+        <div id="bmr-result" class="hcard bmr-result-box"></div>
 
-        <div id="condition-memo-section">
-          <textarea id="condition-memo-input" placeholder="오늘의 컨디션을 자유롭게 기록하세요."></textarea>
-          <button type="button" id="memo-save-btn">메모 저장</button>
+        <div id="condition-memo-section" class="hcard">
+          <div class="sec-lbl">오늘의 컨디션 메모</div>
+          <textarea id="condition-memo-input" class="inp" placeholder="오늘의 컨디션을 자유롭게 기록하세요."></textarea>
+          <button type="button" id="memo-save-btn" class="btn-save">메모 저장</button>
 
+          <button type="button" id="memo-edit-mode-btn" class="btn-edit-toggle">편집</button>
           <div id="memo-list"></div>
         </div>
 
+        </div>
       </div>
     </div>
   </div>
