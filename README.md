@@ -194,3 +194,17 @@
 
 ### 다음에 할 일
 프론트엔드 4개 화면 기능+디자인 전부 완성. 다음 단계는 Step 3(Java/Spring Boot/MySQL 백엔드) — 7/17 체크포인트("식단 기록 하나가 Spring Boot 거쳐 MySQL 저장되고 새로고침해도 유지되는지")로 백엔드 진행 여부 판단 예정. 사소한 디자인 다듬기는 여유 될 때 틈틈이 진행.
+
+
+## 진행상황 2026-07-12
+
+### 오늘 한 일
+- [x] Homebrew + MySQL 설치, `health_project` DB 생성
+- [x] Spring Boot 프로젝트 생성 (Maven, Java 17, Spring Web + JPA + MySQL Driver + Lombok), `health-project/backend` 서브폴더 구조
+- [x] `application.properties`에 MySQL 연결 설정 작성, 서버 최초 실행 확인
+- [x] `Food` Entity + `FoodRepository` + `FoodController` 작성 (POST/GET API 구현)
+- [x] 한글 인코딩 깨짐 문제 해결 (요청/응답 양쪽 UTF-8 설정)
+- [x] Java 제네릭, 상속(`extends`), PK 자동생성, Spring 애노테이션(`@RequestMapping`, `@Autowired` 등) 개념 학습
+
+### 다음에 할 일
+7/13~15 휴가 후, Run·Memo도 Food와 같은 패턴으로 백엔드 확장 → 이후 프론트엔드가 localStorage 대신 서버(`fetch`) 호출하도록 연결.

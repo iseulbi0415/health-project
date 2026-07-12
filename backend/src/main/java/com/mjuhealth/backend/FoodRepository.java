@@ -1,4 +1,6 @@
 package com.mjuhealth.backend;
 
-public class FoodRepository {
+import org.springframework.data.jpa.repository.JpaRepository;
+
+public interface FoodRepository extends JpaRepository<Food, Long>{
 }
