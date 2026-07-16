@@ -208,3 +208,16 @@
 
 ### 다음에 할 일
 7/13~15 휴가 후, Run·Memo도 Food와 같은 패턴으로 백엔드 확장 → 이후 프론트엔드가 localStorage 대신 서버(`fetch`) 호출하도록 연결.
+
+## 진행상황 2026-07-16
+
+### 오늘 한 일
+- [x] `Run`, `Memo` 백엔드 3종(Entity+Repository+Controller) 완성, Food와 동일 패턴으로 확장
+- [x] 각 Controller에 `@CrossOrigin(origins = "*")` 추가 — 프론트(5500)와 백엔드(8080) 포트 달라 발생하는 CORS 문제 해결
+- [x] 각 Controller에 PUT/DELETE 엔드포인트(`/{id}`) 추가하여 CRUD(Create/Read/Update/Delete) 완성
+- [x] `app.js` 전체를 `localStorage` 방식 → `fetch` 기반으로 전환
+- [x] 브라우저 테스트: 식단/러닝/메모 각각 추가·수정·삭제 및 새로고침 후 데이터 유지 확인 완료
+- [x] HTTP 메서드(GET/POST/PUT/DELETE), CORS 개념, `@RestController`/`@RequestMapping` 동작 원리 학습
+
+### 다음에 할 일
+백엔드 CRUD가 안정적으로 자리잡아서, 다음 단계로 트리거 음식(역류 유발 음식) 섭취 시 경고 표시하는 기능을 구상 중. `Food`에 트리거 여부/카테고리 필드를 추가하고, 프론트에서 해당 음식 기록 시 경고 문구를 띄우는 방식으로 진행 예정. 이후엔 이 데이터를 바탕으로 증상-식단 인사이트(규칙기반 통계)까지 이어갈 계획.

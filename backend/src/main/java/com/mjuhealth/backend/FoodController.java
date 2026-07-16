@@ -7,6 +7,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/foods")
+@CrossOrigin(origins = "*")
 public class FoodController {
 
     @Autowired
@@ -21,4 +22,17 @@ public class FoodController {
     public List<Food> getAllFoods() {
         return foodRepository.findAll();
     }
+
+    @PutMapping(value = "/{id}", produces = "application/json;charset=UTF-8")
+    public Food updateFood(@PathVariable Long id, @RequestBody Food food) {
+        food.setId(id);
+        return foodRepository.save(food);
+    }
+
+    @DeleteMapping("/{id}")
+    public void deleteFood(@PathVariable Long id) {
+        foodRepository.deleteById(id);
+    }
 }
+
+

@@ -1,5 +1,8 @@
 // ===== ① 데이터 =====
- 
+
+// 서버 주소 (백엔드가 살아있는 곳)
+const API_BASE = "http://localhost:8080/api";
+
 // --- 식단: 자주 먹는 음식 관련 ---
 const foods = JSON.parse(localStorage.getItem("foods")) || [
     {이름: "바나나", 칼로리: 100, 소화시간: 2},
@@ -8,30 +11,41 @@ const foods = JSON.parse(localStorage.getItem("foods")) || [
 ];
 let isFoodEditMode = false;
 let editingFoodIndex = null;
- 
+
 // --- 식단: 오늘 먹은 음식 관련 ---
-const todayFoods = JSON.parse(localStorage.getItem("todayFoods")) || [];
+let todayFoods = [];
 let isEditMode = false;
 let editingTodayIndex = null;
- 
+
 // --- 식단: 소화 타이머 관련 ---
 let timerId = null;
 let selectedDigest = null;
- 
+
 // --- 러닝 관련 ---
-const runRecords = JSON.parse(localStorage.getItem("runRecords")) || [];
+let runRecords = [];
 let isRunEditMode = false;
 let editingRunIndex = null;
- 
+
 // --- 내 정보 관련 ---
 let selectedGender = null;
 let userWeight = Number(localStorage.getItem("userWeight")) || 60;
 let selectedActivity = null;
- 
+
 // --- 컨디션 메모 관련 ---
-const memoRecords = JSON.parse(localStorage.getItem("memoRecords")) || [];
+let memoRecords = [];
 let isMemoEditMode = false;
 let editingMemoIndex = null;
+
+// --- 서버 데이터 <-> 한글 변수 이름 번역기 (fetch로 주고받을 때만 사용) ---
+function toServerFood(f) { return { name: f.이름, calorie: f.칼로리, digestTime: f.소화시간 }; }
+function fromServerFood(sf) { return { id: sf.id, 이름: sf.name, 칼로리: sf.calorie, 소화시간: sf.digestTime }; }
+
+function toServerRun(r) { return { distance: r.거리, time: r.시간, heartRate: r.심박수, speedKmh: r.시속, calorieBurned: r.칼로리 }; }
+function fromServerRun(sr) { return { id: sr.id, 거리: sr.distance, 시간: sr.time, 심박수: sr.heartRate, 시속: sr.speedKmh, 칼로리: sr.calorieBurned }; }
+
+// symptomScore는 화면 입력칸이 아직 없어서 0으로 고정 전송 (나중에 인사이트 기능에서 실제 값 연결 예정)
+function toServerMemo(m) { return { date: m.날짜, content: m.내용, symptomScore: m.증상점수 || 0 }; }
+function fromServerMemo(sm) { return { id: sm.id, 날짜: sm.date, 내용: sm.content, 증상점수: sm.symptomScore }; }
 
 // ===== ② HTML 요소 찾아오기 =====
 
@@ -96,8 +110,8 @@ function renderQuickAddList() {
             // 전체 편집 모드: 수정/삭제 버튼 바로 보임
             card.innerHTML = `
                 <span class="food-text">${food.이름} - ${food.칼로리} kcal</span>
-                <button type="button" class="btn-edit-item">✏️</button>
-                <button type="button" class="btn-delete-item">🗑️</button>
+                <button type="button" class="btn-edit-item">수정</button>
+                <button type="button" class="btn-delete-item">삭제</button>
             `;
             quickAddList.appendChild(card);
 
@@ -113,14 +127,19 @@ function renderQuickAddList() {
             });
 
         } else {
-            // 평소 모드: 클릭하면 오늘 먹은 음식으로 추가
+            // 평소 모드: 클릭하면 오늘 먹은 음식으로 추가 (서버에 저장)
             const btn = document.createElement("button");
             btn.textContent = food.이름;
             quickAddList.appendChild(btn);
 
-            btn.addEventListener("click", function() {
-                todayFoods.push({...food});
-                saveTodayFoods();
+            btn.addEventListener("click", async function() {
+                const response = await fetch(`${API_BASE}/foods`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(toServerFood({...food}))
+                });
+                const saved = await response.json();
+                todayFoods.push(fromServerFood(saved));
                 renderFoodList();
             });
         }
@@ -131,8 +150,15 @@ function saveFoods() {
     localStorage.setItem("foods", JSON.stringify(foods));
 }
 
-function saveTodayFoods() {
-    localStorage.setItem("todayFoods", JSON.stringify(todayFoods));
+// 서버에서 오늘 먹은 음식 목록 통째로 가져오기
+async function loadTodayFoods() {
+    const response = await fetch(`${API_BASE}/foods`);
+    const serverFoods = await response.json();
+    todayFoods.length = 0;
+    serverFoods.forEach(function(sf) {
+        todayFoods.push(fromServerFood(sf));
+    });
+    renderFoodList();
 }
 
 // 오늘 먹은 음식 목록 + 총 칼로리를 화면에 그리는 함수
@@ -156,12 +182,19 @@ function renderFoodList() {
             `;
             foodList.appendChild(card);
 
-            card.querySelector(".btn-save-small").addEventListener("click", function() {
+            card.querySelector(".btn-save-small").addEventListener("click", async function() {
                 const newName = card.querySelector(".edit-name-input").value;
                 const newCalorie = Number(card.querySelector(".edit-calorie-input").value);
-                todayFoods[index].이름 = newName;
-                todayFoods[index].칼로리 = newCalorie;
-                saveTodayFoods();
+                const updated = { ...todayFoods[index], 이름: newName, 칼로리: newCalorie };
+
+                const response = await fetch(`${API_BASE}/foods/${updated.id}`, {
+                    method: "PUT",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(toServerFood(updated))
+                });
+                const saved = await response.json();
+                todayFoods[index] = fromServerFood(saved);
+
                 editingTodayIndex = null;
                 renderFoodList();
             });
@@ -172,22 +205,29 @@ function renderFoodList() {
             });
 
         } else if (isEditMode) {
-            // 전체 편집 모드: 수정/삭제 버튼이 바로 보임
-            card.innerHTML = `
-                <span class="food-text">${food.이름} - ${food.칼로리} kcal</span>
-                <button type="button" class="btn-edit-item">✏️</button>
-                <button type="button" class="btn-delete-item">🗑️</button>
-            `;
+            // 전체 편집 모드: 수정/삭제 버튼이 바로 보임 (러닝/메모와 통일된 텍스트 버튼)
+            card.innerHTML = `<span class="food-text">${food.이름} - ${food.칼로리} kcal</span>`;
+
+            const editBtn = document.createElement("button");
+            editBtn.textContent = "수정";
+            editBtn.className = "btn-edit-item";
+            card.appendChild(editBtn);
+
+            const deleteBtn = document.createElement("button");
+            deleteBtn.textContent = "삭제";
+            deleteBtn.className = "btn-delete-item";
+            card.appendChild(deleteBtn);
+
             foodList.appendChild(card);
 
-            card.querySelector(".btn-edit-item").addEventListener("click", function() {
+            editBtn.addEventListener("click", function() {
                 editingTodayIndex = index;
                 renderFoodList();
             });
 
-            card.querySelector(".btn-delete-item").addEventListener("click", function() {
+            deleteBtn.addEventListener("click", async function() {
+                await fetch(`${API_BASE}/foods/${todayFoods[index].id}`, { method: "DELETE" });
                 todayFoods.splice(index, 1);
-                saveTodayFoods();
                 renderFoodList();
             });
 
@@ -258,6 +298,18 @@ function startDigestTimer(startSeconds, endTime, totalSeconds) {
 }
 
 // --- 러닝 관련 함수 ---
+
+// 서버에서 러닝 기록 목록 통째로 가져오기
+async function loadRunRecords() {
+    const response = await fetch(`${API_BASE}/runs`);
+    const serverRuns = await response.json();
+    runRecords.length = 0;
+    serverRuns.forEach(function(sr) {
+        runRecords.push(fromServerRun(sr));
+    });
+    renderRunList();
+}
+
 //러닝 기록 목록 화면에 그리는 함수
 function renderRunList() {
     runList.innerHTML = "";
@@ -286,7 +338,7 @@ function renderRunList() {
             `;
             runList.appendChild(card);
 
-            card.querySelector(".btn-save-small").addEventListener("click", function() {
+            card.querySelector(".btn-save-small").addEventListener("click", async function() {
                 if (!card.querySelector(".edit-distance-input").value) {
                     alert("거리를 입력해주세요!");
                     return;
@@ -312,13 +364,23 @@ function renderRunList() {
 
                 const newStats = calculateRunStats(newDistance, newTotalMinutes);
 
-                runRecords[index].거리 = newDistance;
-                runRecords[index].시간 = newTotalMinutes;
-                runRecords[index].심박수 = newHeartrate;
-                runRecords[index].시속 = newStats.speedKmh;
-                runRecords[index].칼로리 = newStats.caloriesBurned;
+                const updated = {
+                    ...runRecords[index],
+                    거리: newDistance,
+                    시간: newTotalMinutes,
+                    심박수: newHeartrate,
+                    시속: newStats.speedKmh,
+                    칼로리: newStats.caloriesBurned
+                };
 
-                saveRunRecords();
+                const response = await fetch(`${API_BASE}/runs/${updated.id}`, {
+                    method: "PUT",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(toServerRun(updated))
+                });
+                const saved = await response.json();
+                runRecords[index] = fromServerRun(saved);
+
                 editingRunIndex = null;
                 renderRunList();
             });
@@ -359,9 +421,9 @@ function renderRunList() {
                     renderRunList();
                 });
 
-                deleteBtn.addEventListener("click", function() {
+                deleteBtn.addEventListener("click", async function() {
+                    await fetch(`${API_BASE}/runs/${runRecords[index].id}`, { method: "DELETE" });
                     runRecords.splice(index, 1);
-                    saveRunRecords();
                     renderRunList();
                 });
             }
@@ -390,10 +452,6 @@ function renderRunList() {
     else {
         document.getElementById("home-run-value").textContent = "아직 기록 없음";
     }
-}
-
-function saveRunRecords() {
-    localStorage.setItem("runRecords", JSON.stringify(runRecords));
 }
 
 // 시속에 따라 MET(운동 강도) 값 결정
@@ -467,6 +525,18 @@ function renderInfo() {
 }
 
 // --- 컨디션 메모 관련 함수 ---
+
+// 서버에서 컨디션 메모 목록 통째로 가져오기
+async function loadMemoRecords() {
+    const response = await fetch(`${API_BASE}/memos`);
+    const serverMemos = await response.json();
+    memoRecords.length = 0;
+    serverMemos.forEach(function(sm) {
+        memoRecords.push(fromServerMemo(sm));
+    });
+    renderMemoList();
+}
+
 function renderMemoList() {
     memoList.innerHTML = "";
 
@@ -483,13 +553,21 @@ function renderMemoList() {
             `;
             memoList.appendChild(card);
 
-            card.querySelector(".btn-save-small").addEventListener("click", function() {
+            card.querySelector(".btn-save-small").addEventListener("click", async function() {
                 if (!card.querySelector(".edit-memo-input").value) {
                     alert("메모를 작성해주세요!");
                     return;
                 }
-                memo.내용 = card.querySelector(".edit-memo-input").value;
-                localStorage.setItem("memoRecords", JSON.stringify(memoRecords));
+                const updated = { ...memo, 내용: card.querySelector(".edit-memo-input").value };
+
+                const response = await fetch(`${API_BASE}/memos/${updated.id}`, {
+                    method: "PUT",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(toServerMemo(updated))
+                });
+                const saved = await response.json();
+                memoRecords[index] = fromServerMemo(saved);
+
                 editingMemoIndex = null;
                 renderMemoList();
             });
@@ -517,9 +595,9 @@ function renderMemoList() {
                     renderMemoList();
                 });
 
-                deleteBtn.addEventListener("click", function() {
+                deleteBtn.addEventListener("click", async function() {
+                    await fetch(`${API_BASE}/memos/${memoRecords[index].id}`, { method: "DELETE" });
                     memoRecords.splice(index, 1);
-                    localStorage.setItem("memoRecords", JSON.stringify(memoRecords));
                     renderMemoList();
                 });
             }
@@ -625,7 +703,7 @@ runEditModeBtn.addEventListener("click", function() {
     renderRunList();
 });
 
-runSaveBtn.addEventListener("click", function() {
+runSaveBtn.addEventListener("click", async function() {
     if (!document.getElementById("run-distance-input").value) {
         alert("거리를 입력해주세요!");
         return;
@@ -659,8 +737,13 @@ runSaveBtn.addEventListener("click", function() {
         칼로리: stats.caloriesBurned
     };
 
-    runRecords.push(newRecord);
-    saveRunRecords();
+    const response = await fetch(`${API_BASE}/runs`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(toServerRun(newRecord))
+    });
+    const saved = await response.json();
+    runRecords.push(fromServerRun(saved));
 
     document.getElementById("run-distance-input").value = "";
     document.getElementById("run-time-input").value = "";
@@ -762,7 +845,7 @@ memoEditModeBtn.addEventListener("click", function() {
     renderMemoList();
 });
 
-memoSaveBtn.addEventListener("click", function() {
+memoSaveBtn.addEventListener("click", async function() {
     if (!memoInput.value){
         alert("메모를 작성해주세요!");
         return;
@@ -776,8 +859,14 @@ memoSaveBtn.addEventListener("click", function() {
         내용: memoInput.value
     };
 
-    memoRecords.push(newMemo);
-    localStorage.setItem("memoRecords", JSON.stringify(memoRecords));
+    const response = await fetch(`${API_BASE}/memos`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(toServerMemo(newMemo))
+    });
+    const saved = await response.json();
+    memoRecords.push(fromServerMemo(saved));
+
     memoInput.value = "";
     renderMemoList();
 });
@@ -801,10 +890,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // ===== ⑤ 초기 실행 =====
 renderQuickAddList();
-renderFoodList();
-renderRunList();
+loadTodayFoods();   // renderFoodList()는 이 함수 안에서 자동으로 호출됨
+loadRunRecords();   // renderRunList()는 이 함수 안에서 자동으로 호출됨
 renderInfo();
-renderMemoList();
+loadMemoRecords();  // renderMemoList()는 이 함수 안에서 자동으로 호출됨
 
 // 페이지 열릴때: 저장된 소화 타이머가 있으면 남은 시간을 계산해서 이어서 시작
 const savedEndTime = localStorage.getItem("digestEndTime");
