@@ -5,16 +5,18 @@ const API_BASE = "http://localhost:8080/api";
 
 // --- 식단: 자주 먹는 음식 관련 ---
 const foods = JSON.parse(localStorage.getItem("foods")) || [
-    {이름: "바나나", 칼로리: 100, 소화시간: 2},
-    {이름: "닭가슴살", 칼로리: 165, 소화시간: 3},
-    {이름: "삼겹살", 칼로리: 330, 소화시간: 4}
+    { 이름: "바나나", 칼로리: 100, 소화시간: 2, 트리거: false },
+    { 이름: "닭가슴살", 칼로리: 165, 소화시간: 3, 트리거: false },
+    { 이름: "삼겹살", 칼로리: 330, 소화시간: 4, 트리거: true }
 ];
-let isFoodEditMode = false;
+
+// openQuickAddIndex: 롱프레스로 수정/삭제 버튼이 열려있는 카드 인덱스 (한 번에 하나만 열림)
+let openQuickAddIndex = null;
 let editingFoodIndex = null;
 
 // --- 식단: 오늘 먹은 음식 관련 ---
 let todayFoods = [];
-let isEditMode = false;
+let openFoodIndex = null;
 let editingTodayIndex = null;
 
 // --- 식단: 소화 타이머 관련 ---
@@ -23,7 +25,7 @@ let selectedDigest = null;
 
 // --- 러닝 관련 ---
 let runRecords = [];
-let isRunEditMode = false;
+let openRunIndex = null;
 let editingRunIndex = null;
 
 // --- 내 정보 관련 ---
@@ -33,15 +35,21 @@ let selectedActivity = null;
 
 // --- 컨디션 메모 관련 ---
 let memoRecords = [];
-let isMemoEditMode = false;
+let openMemoIndex = null;
 let editingMemoIndex = null;
 
-// --- 서버 데이터 <-> 한글 변수 이름 번역기 (fetch로 주고받을 때만 사용) ---
-function toServerFood(f) { return { name: f.이름, calorie: f.칼로리, digestTime: f.소화시간 }; }
-function fromServerFood(sf) { return { id: sf.id, 이름: sf.name, 칼로리: sf.calorie, 소화시간: sf.digestTime }; }
+// 방금 롱프레스로 열렸는지 표시(quick-add 버튼은 클릭=빠른추가 동작도 겸하고 있어서,
+// 롱프레스 직후 발생하는 click을 "추가"로 오인하지 않도록 구분하는 용도)
+let quickAddLongPressFired = false;
 
-function toServerRun(r) { return { distance: r.거리, time: r.시간, heartRate: r.심박수, speedKmh: r.시속, calorieBurned: r.칼로리 }; }
-function fromServerRun(sr) { return { id: sr.id, 거리: sr.distance, 시간: sr.time, 심박수: sr.heartRate, 시속: sr.speedKmh, 칼로리: sr.calorieBurned }; }
+// --- 서버 데이터 <-> 한글 변수 이름 번역기 (fetch로 주고받을 때만 사용) ---
+// 기록시각(recordedAt)은 화면에 표시/입력하는 곳은 아직 없지만, PUT으로 되돌려 보낼 때
+// 값이 없으면 서버가 null로 덮어쓰지 않고 기존 값을 유지하므로 왕복 전달만 해둠(향후 날짜별 기록 관리 기능 대비)
+function toServerFood(f) { return { name: f.이름, calorie: f.칼로리, digestTime: f.소화시간, isTrigger: f.트리거 || false, recordedAt: f.기록시각 || null }; }
+function fromServerFood(sf) { return { id: sf.id, 이름: sf.name, 칼로리: sf.calorie, 소화시간: sf.digestTime, 트리거: sf.isTrigger, 기록시각: sf.recordedAt }; }
+
+function toServerRun(r) { return { distance: r.거리, time: r.시간, heartRate: r.심박수, speedKmh: r.시속, calorieBurned: r.칼로리, recordedAt: r.기록시각 || null }; }
+function fromServerRun(sr) { return { id: sr.id, 거리: sr.distance, 시간: sr.time, 심박수: sr.heartRate, 시속: sr.speedKmh, 칼로리: sr.calorieBurned, 기록시각: sr.recordedAt }; }
 
 // symptomScore는 화면 입력칸이 아직 없어서 0으로 고정 전송 (나중에 인사이트 기능에서 실제 값 연결 예정)
 function toServerMemo(m) { return { date: m.날짜, content: m.내용, symptomScore: m.증상점수 || 0 }; }
@@ -50,15 +58,12 @@ function fromServerMemo(sm) { return { id: sm.id, 날짜: sm.date, 내용: sm.co
 // ===== ② HTML 요소 찾아오기 =====
 
 const quickAddList = document.getElementById("quick-add-list");
-const foodEditModeBtn = document.getElementById("food-edit-mode-btn");
 const foodList = document.getElementById("food-list");
-const editModeBtn = document.getElementById("edit-mode-btn");
 const mealCompleteBtn = document.getElementById("meal-complete-btn");
 const addFoodBtn = document.getElementById("add-food-btn");
 const digestButtons = document.querySelectorAll(".digest-btn");
 const digestCancelBtn = document.getElementById("digest-cancel-btn");
 
-const runEditModeBtn = document.getElementById("run-edit-mode-btn");
 const runList = document.getElementById("run-list");
 const runSaveBtn = document.getElementById("run-save-btn");
 
@@ -66,18 +71,67 @@ const genderButtons = document.querySelectorAll(".gender-btn");
 const infoSaveBtn = document.getElementById("info-save-btn");
 const activityButtons = document.querySelectorAll(".activity-btn");
 
-const memoEditModeBtn = document.getElementById("memo-edit-mode-btn");
 const memoInput = document.getElementById("condition-memo-input");
 const memoSaveBtn = document.getElementById("memo-save-btn");
 const memoList = document.getElementById("memo-list");
 // ===== ③ 함수 정의 =====
+
+// --- 편집 UX 공용 헬퍼 (식단/러닝/메모 4개 목록에서 재사용) ---
+
+// 요소를 500ms 이상 누르고 있으면 콜백 실행 (수정/삭제 버튼 노출용 롱프레스)
+function attachLongPress(el, callback) {
+    let timer = null;
+    el.addEventListener("mousedown", function () {
+        timer = setTimeout(callback, 500);
+    });
+    el.addEventListener("mouseup", function () { clearTimeout(timer); });
+    el.addEventListener("mouseleave", function () { clearTimeout(timer); });
+}
+
+// "2026. 7. 17." 같은 기존 한국어 날짜 포맷이나 "2026-07-17"(+시간) 같은 ISO 포맷을 모두
+// <input type="date">가 요구하는 "YYYY-MM-DD"로 통일해서 돌려줌. 못 알아보는 값이면 빈 문자열.
+// (러닝의 recordedAt처럼 ISO datetime 문자열에서 날짜 부분만 뽑을 때도 재사용)
+function toDateInputValue(dateStr) {
+    if (!dateStr) return "";
+    const isoMatch = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (isoMatch) return isoMatch[0];
+    const krMatch = dateStr.match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/);
+    if (krMatch) {
+        return `${krMatch[1]}-${krMatch[2].padStart(2, "0")}-${krMatch[3].padStart(2, "0")}`;
+    }
+    return "";
+}
+
+// 오늘 날짜를 로컬 기준 "YYYY-MM-DD"로 (toISOString은 UTC라 자정 근처에 날짜가 밀릴 수 있어 직접 조합)
+function todayDateString() {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+}
+
+// recordedAt(ISO datetime)의 날짜 부분만 새 값으로 바꾸고 기존 시:분:초는 유지
+function withUpdatedDate(recordedAt, newDateStr) {
+    const timePart = recordedAt ? recordedAt.slice(10) : "T00:00:00";
+    return newDateStr + timePart;
+}
+
+// 롱프레스로 열린 카드 바깥을 클릭하면 자동으로 닫기
+// container.children[openIndex]가 "지금 열려있는 그 카드"인 이유: render 함수가 매번
+// 데이터 배열 순서대로 카드를 하나씩 append하므로 인덱스와 DOM 자식 순번이 항상 1:1로 일치함
+function closeIfOutside(container, openIndex, setOpenIndex, renderFn, e) {
+    if (openIndex === null) return;
+    const openCard = container.children[openIndex];
+    if (openCard && !openCard.contains(e.target)) {
+        setOpenIndex(null);
+        renderFn();
+    }
+}
 
 // --- 식단 관련 함수 ---
 // 자주 먹는 음식 빠른 추가 버튼 다시 그리기
 function renderQuickAddList() {
     quickAddList.innerHTML = "";
 
-    foods.forEach(function(food, index) {
+    foods.forEach(function (food, index) {
         const card = document.createElement("div");
         card.className = "food-card";
 
@@ -91,7 +145,7 @@ function renderQuickAddList() {
             `;
             quickAddList.appendChild(card);
 
-            card.querySelector(".btn-save-small").addEventListener("click", function() {
+            card.querySelector(".btn-save-small").addEventListener("click", function () {
                 const newName = card.querySelector(".edit-fname-input").value;
                 const newCalorie = Number(card.querySelector(".edit-fcalorie-input").value);
                 foods[index].이름 = newName;
@@ -101,13 +155,13 @@ function renderQuickAddList() {
                 renderQuickAddList();
             });
 
-            card.querySelector(".btn-cancel-small").addEventListener("click", function() {
+            card.querySelector(".btn-cancel-small").addEventListener("click", function () {
                 editingFoodIndex = null;
                 renderQuickAddList();
             });
 
-        } else if (isFoodEditMode) {
-            // 전체 편집 모드: 수정/삭제 버튼 바로 보임
+        } else if (openQuickAddIndex === index) {
+            // 롱프레스로 열린 상태: 수정/삭제 버튼 노출
             card.innerHTML = `
                 <span class="food-text">${food.이름} - ${food.칼로리} kcal</span>
                 <button type="button" class="btn-edit-item">수정</button>
@@ -115,28 +169,42 @@ function renderQuickAddList() {
             `;
             quickAddList.appendChild(card);
 
-            card.querySelector(".btn-edit-item").addEventListener("click", function() {
+            card.querySelector(".btn-edit-item").addEventListener("click", function () {
                 editingFoodIndex = index;
+                openQuickAddIndex = null;
                 renderQuickAddList();
             });
 
-            card.querySelector(".btn-delete-item").addEventListener("click", function() {
+            card.querySelector(".btn-delete-item").addEventListener("click", function () {
                 foods.splice(index, 1);
                 saveFoods();
+                openQuickAddIndex = null;
                 renderQuickAddList();
             });
 
         } else {
-            // 평소 모드: 클릭하면 오늘 먹은 음식으로 추가 (서버에 저장)
+            // 평소 모드: 클릭하면 오늘 먹은 음식으로 추가, 500ms 이상 누르면 수정/삭제 버튼 노출
             const btn = document.createElement("button");
             btn.textContent = food.이름;
             quickAddList.appendChild(btn);
 
-            btn.addEventListener("click", async function() {
+            attachLongPress(btn, function () {
+                quickAddLongPressFired = true;
+                openQuickAddIndex = index;
+                renderQuickAddList();
+            });
+
+            btn.addEventListener("click", async function () {
+                // 롱프레스 직후에 이어서 발생하는 click은 "빠른 추가"가 아니라 롱프레스 제스처의 일부이므로 무시
+                if (quickAddLongPressFired) {
+                    quickAddLongPressFired = false;
+                    return;
+                }
+
                 const response = await fetch(`${API_BASE}/foods`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(toServerFood({...food}))
+                    body: JSON.stringify(toServerFood({ ...food }))
                 });
                 const saved = await response.json();
                 todayFoods.push(fromServerFood(saved));
@@ -155,7 +223,7 @@ async function loadTodayFoods() {
     const response = await fetch(`${API_BASE}/foods`);
     const serverFoods = await response.json();
     todayFoods.length = 0;
-    serverFoods.forEach(function(sf) {
+    serverFoods.forEach(function (sf) {
         todayFoods.push(fromServerFood(sf));
     });
     renderFoodList();
@@ -166,7 +234,7 @@ function renderFoodList() {
     foodList.innerHTML = "";
     let total = 0;
 
-    todayFoods.forEach(function(food, index) {
+    todayFoods.forEach(function (food, index) {
         total += food.칼로리;
 
         const card = document.createElement("div");
@@ -182,7 +250,7 @@ function renderFoodList() {
             `;
             foodList.appendChild(card);
 
-            card.querySelector(".btn-save-small").addEventListener("click", async function() {
+            card.querySelector(".btn-save-small").addEventListener("click", async function () {
                 const newName = card.querySelector(".edit-name-input").value;
                 const newCalorie = Number(card.querySelector(".edit-calorie-input").value);
                 const updated = { ...todayFoods[index], 이름: newName, 칼로리: newCalorie };
@@ -199,14 +267,15 @@ function renderFoodList() {
                 renderFoodList();
             });
 
-            card.querySelector(".btn-cancel-small").addEventListener("click", function() {
+            card.querySelector(".btn-cancel-small").addEventListener("click", function () {
                 editingTodayIndex = null;
                 renderFoodList();
             });
 
-        } else if (isEditMode) {
-            // 전체 편집 모드: 수정/삭제 버튼이 바로 보임 (러닝/메모와 통일된 텍스트 버튼)
-            card.innerHTML = `<span class="food-text">${food.이름} - ${food.칼로리} kcal</span>`;
+        } else if (openFoodIndex === index) {
+            // 롱프레스로 열린 상태: 수정/삭제 버튼 노출
+            const triggerTag = food.트리거 ? ` <span class="trigger-tag">⚠️ 트리거</span>` : "";
+            card.innerHTML = `<span class="food-text">${food.이름} - ${food.칼로리} kcal${triggerTag}</span>`;
 
             const editBtn = document.createElement("button");
             editBtn.textContent = "수정";
@@ -220,21 +289,29 @@ function renderFoodList() {
 
             foodList.appendChild(card);
 
-            editBtn.addEventListener("click", function() {
+            editBtn.addEventListener("click", function () {
                 editingTodayIndex = index;
+                openFoodIndex = null;
                 renderFoodList();
             });
 
-            deleteBtn.addEventListener("click", async function() {
+            deleteBtn.addEventListener("click", async function () {
                 await fetch(`${API_BASE}/foods/${todayFoods[index].id}`, { method: "DELETE" });
                 todayFoods.splice(index, 1);
+                openFoodIndex = null;
                 renderFoodList();
             });
 
         } else {
-            // 평소 모드: 그냥 보기만
-            card.innerHTML = `<span class="food-text">${food.이름} - ${food.칼로리} kcal</span>`;
+            // 평소 모드: 500ms 이상 누르면 수정/삭제 버튼 노출
+            const triggerTag = food.트리거 ? ` <span class="trigger-tag">⚠️ 트리거</span>` : "";
+            card.innerHTML = `<span class="food-text">${food.이름} - ${food.칼로리} kcal${triggerTag}</span>`;
             foodList.appendChild(card);
+
+            attachLongPress(card, function () {
+                openFoodIndex = index;
+                renderFoodList();
+            });
         }
     });
 
@@ -258,10 +335,10 @@ function startDigestTimer(startSeconds, endTime, totalSeconds) {
         clearInterval(timerId);
     }
 
-    timerId = setInterval(function() {
+    timerId = setInterval(function () {
         remainingSeconds -= 1;
 
-        if(remainingSeconds < 0) {
+        if (remainingSeconds < 0) {
             remainingSeconds = 0;
         }
 
@@ -304,7 +381,7 @@ async function loadRunRecords() {
     const response = await fetch(`${API_BASE}/runs`);
     const serverRuns = await response.json();
     runRecords.length = 0;
-    serverRuns.forEach(function(sr) {
+    serverRuns.forEach(function (sr) {
         runRecords.push(fromServerRun(sr));
     });
     renderRunList();
@@ -314,10 +391,10 @@ async function loadRunRecords() {
 function renderRunList() {
     runList.innerHTML = "";
 
-    runRecords.forEach(function(record,index) {
+    runRecords.forEach(function (record, index) {
 
         const totalMin = Math.floor(record.시간);
-        const totalSec = Math.round((record.시간 - totalMin)*60);
+        const totalSec = Math.round((record.시간 - totalMin) * 60);
         const timeDisplay = totalSec > 0 ? `${totalMin}분 ${totalSec}초` : `${totalMin}분`;
 
         const paceTotalSec = Math.round((record.시간 / record.거리) * 60);
@@ -331,14 +408,15 @@ function renderRunList() {
             // 수정 모드 (이 항목만) — mm:ss 입력칸엔 기존 값을 다시 채워둠
             card.innerHTML = `
                 <input type="number" class="inp edit-distance-input" value="${record.거리}" step="0.01">
-                <input type="text" class="inp edit-time-input" value="${totalMin}:${String(totalSec).padStart(2,'0')}">
+                <input type="text" class="inp edit-time-input" value="${totalMin}:${String(totalSec).padStart(2, '0')}">
                 <input type="number" class="inp edit-heartrate-input" value="${record.심박수}">
+                <input type="date" class="inp edit-run-date-input" value="${toDateInputValue(record.기록시각)}">
                 <button type="button" class="btn-save-small">저장</button>
                 <button type="button" class="btn-cancel-small">취소</button>
             `;
             runList.appendChild(card);
 
-            card.querySelector(".btn-save-small").addEventListener("click", async function() {
+            card.querySelector(".btn-save-small").addEventListener("click", async function () {
                 if (!card.querySelector(".edit-distance-input").value) {
                     alert("거리를 입력해주세요!");
                     return;
@@ -351,6 +429,10 @@ function renderRunList() {
                     alert("심박수를 입력해주세요!");
                     return;
                 }
+                if (!card.querySelector(".edit-run-date-input").value) {
+                    alert("날짜를 선택해주세요!");
+                    return;
+                }
 
                 const newDistance = Number(card.querySelector(".edit-distance-input").value);
 
@@ -361,6 +443,7 @@ function renderRunList() {
                 const newTotalMinutes = newMinutes + (newSeconds / 60);
 
                 const newHeartrate = Number(card.querySelector(".edit-heartrate-input").value);
+                const newDate = card.querySelector(".edit-run-date-input").value;
 
                 const newStats = calculateRunStats(newDistance, newTotalMinutes);
 
@@ -370,7 +453,8 @@ function renderRunList() {
                     시간: newTotalMinutes,
                     심박수: newHeartrate,
                     시속: newStats.speedKmh,
-                    칼로리: newStats.caloriesBurned
+                    칼로리: newStats.caloriesBurned,
+                    기록시각: withUpdatedDate(record.기록시각, newDate)
                 };
 
                 const response = await fetch(`${API_BASE}/runs/${updated.id}`, {
@@ -385,7 +469,7 @@ function renderRunList() {
                 renderRunList();
             });
 
-            card.querySelector(".btn-cancel-small").addEventListener("click", function() {
+            card.querySelector(".btn-cancel-small").addEventListener("click", function () {
                 editingRunIndex = null;
                 renderRunList();
             });
@@ -393,6 +477,7 @@ function renderRunList() {
         } else {
             // 평소/편집모드 공통: 정보 그리드는 항상 보여줌
             card.innerHTML = `
+            <div class="rc-date">${toDateInputValue(record.기록시각) || "날짜 없음"}</div>
             <div class="rc-grid">
                 <div class="rc-stat"><div class="rc-val">${record.거리}km</div><div class="rc-lbl">거리</div></div>
                 <div class="rc-stat"><div class="rc-val">${timeDisplay}</div><div class="rc-lbl">시간</div></div>
@@ -404,8 +489,8 @@ function renderRunList() {
             `;
             runList.appendChild(card);
 
-            if (isRunEditMode) {
-                // 편집 모드: 수정/삭제 버튼 보임
+            if (openRunIndex === index) {
+                // 롱프레스로 열린 상태: 수정/삭제 버튼 노출
                 const editBtn = document.createElement("button");
                 editBtn.textContent = "수정";
                 editBtn.className = "btn-edit-item";
@@ -416,14 +501,22 @@ function renderRunList() {
                 deleteBtn.className = "btn-delete-item";
                 card.appendChild(deleteBtn);
 
-                editBtn.addEventListener("click", function() {
+                editBtn.addEventListener("click", function () {
                     editingRunIndex = index;
+                    openRunIndex = null;
                     renderRunList();
                 });
 
-                deleteBtn.addEventListener("click", async function() {
+                deleteBtn.addEventListener("click", async function () {
                     await fetch(`${API_BASE}/runs/${runRecords[index].id}`, { method: "DELETE" });
                     runRecords.splice(index, 1);
+                    openRunIndex = null;
+                    renderRunList();
+                });
+            } else {
+                // 평소 모드: 500ms 이상 누르면 수정/삭제 버튼 노출
+                attachLongPress(card, function () {
+                    openRunIndex = index;
                     renderRunList();
                 });
             }
@@ -435,7 +528,7 @@ function renderRunList() {
         const latestMin = Math.floor(latest.시간);
         const latestSec = Math.round((latest.시간 - latestMin) * 60);
         const latestTimeDisplay = latestSec > 0 ? `${latestMin}분 ${latestSec}초` : `${latestMin}분`;
-        
+
         const paceTotalSec = Math.round((latest.시간 / latest.거리) * 60);
         const paceMin = Math.floor(paceTotalSec / 60);
         const paceSec = paceTotalSec % 60;
@@ -500,17 +593,17 @@ function renderInfo() {
 
     if (savedGender) {
         selectedGender = savedGender;
-        genderButtons.forEach(function(b){
-            if (b.dataset.gender === savedGender){
+        genderButtons.forEach(function (b) {
+            if (b.dataset.gender === savedGender) {
                 b.classList.add("selected");
             }
         });
     }
-    
+
     if (savedActivity) {
         selectedActivity = Number(savedActivity);
-        activityButtons.forEach(function(b){
-            if (b.dataset.activity === savedActivity){
+        activityButtons.forEach(function (b) {
+            if (b.dataset.activity === savedActivity) {
                 b.classList.add("selected");
             }
         });
@@ -531,7 +624,7 @@ async function loadMemoRecords() {
     const response = await fetch(`${API_BASE}/memos`);
     const serverMemos = await response.json();
     memoRecords.length = 0;
-    serverMemos.forEach(function(sm) {
+    serverMemos.forEach(function (sm) {
         memoRecords.push(fromServerMemo(sm));
     });
     renderMemoList();
@@ -540,25 +633,35 @@ async function loadMemoRecords() {
 function renderMemoList() {
     memoList.innerHTML = "";
 
-    memoRecords.forEach(function(memo, index) {
+    memoRecords.forEach(function (memo, index) {
         const card = document.createElement("div");
 
         if (editingMemoIndex === index) {
-            // 수정 모드 — 날짜는 안 건드리고, 내용만 수정
+            // 수정 모드 — 날짜/내용 둘 다 수정 가능
+            // type="date" 네이티브 달력 위젯 사용: 자유 텍스트로 두면 아무 글자나 입력되는 문제가 있어
+            // 유효한 날짜만 고를 수 있도록 강제함. 기존 한국어 포맷 기록도 toDateInputValue로 변환해 채움
             card.innerHTML = `
-                <strong>${memo.날짜}</strong>
+                <input type="date" class="inp edit-memo-date-input" value="${toDateInputValue(memo.날짜)}">
                 <textarea class="inp edit-memo-input">${memo.내용}</textarea>
                 <button type="button" class="btn-save-small">저장</button>
                 <button type="button" class="btn-cancel-small">취소</button>
             `;
             memoList.appendChild(card);
 
-            card.querySelector(".btn-save-small").addEventListener("click", async function() {
+            card.querySelector(".btn-save-small").addEventListener("click", async function () {
+                if (!card.querySelector(".edit-memo-date-input").value) {
+                    alert("날짜를 입력해주세요!");
+                    return;
+                }
                 if (!card.querySelector(".edit-memo-input").value) {
                     alert("메모를 작성해주세요!");
                     return;
                 }
-                const updated = { ...memo, 내용: card.querySelector(".edit-memo-input").value };
+                const updated = {
+                    ...memo,
+                    날짜: card.querySelector(".edit-memo-date-input").value,
+                    내용: card.querySelector(".edit-memo-input").value
+                };
 
                 const response = await fetch(`${API_BASE}/memos/${updated.id}`, {
                     method: "PUT",
@@ -572,35 +675,46 @@ function renderMemoList() {
                 renderMemoList();
             });
 
-            card.querySelector(".btn-cancel-small").addEventListener("click", function() {
+            card.querySelector(".btn-cancel-small").addEventListener("click", function () {
                 editingMemoIndex = null;
                 renderMemoList();
             });
 
-        } else {
+        } else if (openMemoIndex === index) {
+            // 롱프레스로 열린 상태: 수정/삭제 버튼 노출
             card.innerHTML = `<strong>${memo.날짜}</strong><br>${memo.내용}`;
             memoList.appendChild(card);
 
-            if (isMemoEditMode) {
-                const editBtn = document.createElement("button");
-                editBtn.textContent = "수정";
-                card.appendChild(editBtn);
+            const editBtn = document.createElement("button");
+            editBtn.textContent = "수정";
+            card.appendChild(editBtn);
 
-                const deleteBtn = document.createElement("button");
-                deleteBtn.textContent = "삭제";
-                card.appendChild(deleteBtn);
+            const deleteBtn = document.createElement("button");
+            deleteBtn.textContent = "삭제";
+            card.appendChild(deleteBtn);
 
-                editBtn.addEventListener("click", function() {
-                    editingMemoIndex = index;
-                    renderMemoList();
-                });
+            editBtn.addEventListener("click", function () {
+                editingMemoIndex = index;
+                openMemoIndex = null;
+                renderMemoList();
+            });
 
-                deleteBtn.addEventListener("click", async function() {
-                    await fetch(`${API_BASE}/memos/${memoRecords[index].id}`, { method: "DELETE" });
-                    memoRecords.splice(index, 1);
-                    renderMemoList();
-                });
-            }
+            deleteBtn.addEventListener("click", async function () {
+                await fetch(`${API_BASE}/memos/${memoRecords[index].id}`, { method: "DELETE" });
+                memoRecords.splice(index, 1);
+                openMemoIndex = null;
+                renderMemoList();
+            });
+
+        } else {
+            // 평소 모드: 500ms 이상 누르면 수정/삭제 버튼 노출
+            card.innerHTML = `<strong>${memo.날짜}</strong><br>${memo.내용}`;
+            memoList.appendChild(card);
+
+            attachLongPress(card, function () {
+                openMemoIndex = index;
+                renderMemoList();
+            });
         }
     });
 }
@@ -609,17 +723,17 @@ function renderMemoList() {
 
 // --- 식단 관련 이벤트 ---
 // "식사 완료" 버튼 클릭 시: 가장 오래 걸리는 소화시간을 찾아서 끝나는 시각을 저장하고 타이머 시작
-mealCompleteBtn.addEventListener("click", function() {
+mealCompleteBtn.addEventListener("click", function () {
 
     let maxTime = 0;
-    todayFoods.forEach(function(food) {
+    todayFoods.forEach(function (food) {
         if (food.소화시간 > maxTime) {
             maxTime = food.소화시간;
         }
     });
-    
+
     const totalSeconds = maxTime * 3600;
-    const endTime = Date.now() + (totalSeconds * 1000); 
+    const endTime = Date.now() + (totalSeconds * 1000);
     localStorage.setItem("digestEndTime", endTime);
     localStorage.setItem("digestTotalSeconds", totalSeconds);
 
@@ -628,7 +742,7 @@ mealCompleteBtn.addEventListener("click", function() {
 });
 
 // "타이머 취소" 버튼 클릭 시: 타이머 정지 + 저장된 끝나는 시각 삭제 + 화면 초기화
-digestCancelBtn.addEventListener("click", function() {
+digestCancelBtn.addEventListener("click", function () {
     if (timerId !== null) {
         clearInterval(timerId);
         timerId = null;
@@ -645,26 +759,10 @@ digestCancelBtn.addEventListener("click", function() {
     document.getElementById("home-digest-warning").textContent = "";
 });
 
-// "편집" 버튼 클릭 시: 전체 편집 모드 켜고 끄기
-editModeBtn.addEventListener("click", function() {
-    isEditMode = !isEditMode;
-    editModeBtn.textContent = isEditMode ? "완료" : "편집";
-    editingTodayIndex = null;
-    renderFoodList();
-});
-
-// "편집" 버튼 클릭 시: 자주 먹는 음식 전체 편집 모드 켜고 끄기
-foodEditModeBtn.addEventListener("click", function() {
-    isFoodEditMode = !isFoodEditMode;
-    foodEditModeBtn.textContent = isFoodEditMode ? "완료" : "편집";
-    editingFoodIndex = null;
-    renderQuickAddList();
-});
-
 // 소화시간 카테고리 버튼 클릭 시: 선택 표시 토글 + selectedDigest 값 저장
-digestButtons.forEach(function(btn) {
-    btn.addEventListener("click", function() {
-        digestButtons.forEach(function(b) {
+digestButtons.forEach(function (btn) {
+    btn.addEventListener("click", function () {
+        digestButtons.forEach(function (b) {
             b.classList.remove("selected");
         });
         btn.classList.add("selected");
@@ -674,7 +772,7 @@ digestButtons.forEach(function(btn) {
 });
 
 // "음식 추가" 버튼 클릭 시: 입력값+선택된 소화시간으로 새 음식을 foods에 추가
-addFoodBtn.addEventListener("click", function() {
+addFoodBtn.addEventListener("click", function () {
     if (selectedDigest === null) {
         alert("소화 시간 카테고리를 선택해주세요!");
         return;
@@ -682,11 +780,13 @@ addFoodBtn.addEventListener("click", function() {
 
     const nameValue = document.getElementById("food-name-input").value;
     const calorieValue = document.getElementById("food-calorie-input").value;
+    const triggerValue = document.getElementById("food-trigger-input").checked;
 
     const newFood = {
         이름: nameValue,
         칼로리: Number(calorieValue),
-        소화시간: selectedDigest
+        소화시간: selectedDigest,
+        트리거: triggerValue
     };
 
     foods.push(newFood);
@@ -695,15 +795,7 @@ addFoodBtn.addEventListener("click", function() {
 });
 
 // --- 러닝 관련 이벤트 ---
-// "편집" 버튼 클릭 시: 러닝 기록 전체 편집 모드 켜고 끄기
-runEditModeBtn.addEventListener("click", function() {
-    isRunEditMode = !isRunEditMode;
-    runEditModeBtn.textContent = isRunEditMode ? "완료" : "편집";
-    editingRunIndex = null;
-    renderRunList();
-});
-
-runSaveBtn.addEventListener("click", async function() {
+runSaveBtn.addEventListener("click", async function () {
     if (!document.getElementById("run-distance-input").value) {
         alert("거리를 입력해주세요!");
         return;
@@ -722,7 +814,7 @@ runSaveBtn.addEventListener("click", async function() {
     const timeValue = (document.getElementById("run-time-input").value);
     const timeParts = timeValue.split(":");
     const minutes = Number(timeParts[0]);
-    const seconds = Number(timeParts[1]) || 0;
+    const seconds = Number(timeParts[40]) || 0;
     const totalMinutes = minutes + (seconds / 60);
 
     const heartrate = Number(document.getElementById("run-heartrate-input").value);
@@ -754,9 +846,9 @@ runSaveBtn.addEventListener("click", async function() {
 
 // --- 내 정보 관련 이벤트 ---
 // 성별 버튼 클릭 시: 선택 표시 토글 + selectedGender 값 저장
-genderButtons.forEach(function(btn) {
-    btn.addEventListener("click", function() {
-        genderButtons.forEach(function(b) {
+genderButtons.forEach(function (btn) {
+    btn.addEventListener("click", function () {
+        genderButtons.forEach(function (b) {
             b.classList.remove("selected");
         });
         btn.classList.add("selected");
@@ -766,20 +858,20 @@ genderButtons.forEach(function(btn) {
 });
 
 // 활동량 버튼 클릭 시: 선택 표시 토글 + selectedActivity 값 저장
-activityButtons.forEach(function(btn) {
-    btn.addEventListener("click", function() {
-        activityButtons.forEach(function(b) {
+activityButtons.forEach(function (btn) {
+    btn.addEventListener("click", function () {
+        activityButtons.forEach(function (b) {
             b.classList.remove("selected");
         });
         btn.classList.add("selected");
         selectedActivity = Number(btn.dataset.activity);
     });
-});    
+});
 
 // "정보 저장" 버튼 클릭 시: 입력값으로 BMR 계산
 // 공식 출처: Mifflin-St Jeor Equation (1990) — 미국 영양학회(Academy of Nutrition and Dietetics) 권장 공식
 // 출처: TDEE = BMR × 활동계수(1.2~1.9), 증량은 TDEE+300~500kcal (일반적으로 권장되는 범위)
-infoSaveBtn.addEventListener("click", function() {
+infoSaveBtn.addEventListener("click", function () {
     if (!document.getElementById("info-weight-input").value) {
         alert("체중을 입력해주세요!");
         return;
@@ -837,25 +929,14 @@ infoSaveBtn.addEventListener("click", function() {
 });
 
 // --- 컨디션 메모 관련 이벤트 ---
-// "편집" 버튼 클릭 시: 메모 기록 전체 편집 모드 켜고 끄기
-memoEditModeBtn.addEventListener("click", function() {
-    isMemoEditMode = !isMemoEditMode;
-    memoEditModeBtn.textContent = isMemoEditMode ? "완료" : "편집";
-    editingMemoIndex = null;
-    renderMemoList();
-});
-
-memoSaveBtn.addEventListener("click", async function() {
-    if (!memoInput.value){
+memoSaveBtn.addEventListener("click", async function () {
+    if (!memoInput.value) {
         alert("메모를 작성해주세요!");
         return;
     }
-    
-    const today = new Date();
-    const dateString = today.toLocaleDateString("ko-KR");
 
     const newMemo = {
-        날짜: dateString,
+        날짜: todayDateString(),
         내용: memoInput.value
     };
 
@@ -871,16 +952,24 @@ memoSaveBtn.addEventListener("click", async function() {
     renderMemoList();
 });
 
+// --- 편집 UX 공용: 롱프레스로 열린 카드 바깥 클릭 시 닫기 ---
+document.addEventListener("click", function (e) {
+    closeIfOutside(quickAddList, openQuickAddIndex, function (v) { openQuickAddIndex = v; }, renderQuickAddList, e);
+    closeIfOutside(foodList, openFoodIndex, function (v) { openFoodIndex = v; }, renderFoodList, e);
+    closeIfOutside(runList, openRunIndex, function (v) { openRunIndex = v; }, renderRunList, e);
+    closeIfOutside(memoList, openMemoIndex, function (v) { openMemoIndex = v; }, renderMemoList, e);
+});
+
 // --- 전역(탭바) ---
 // 하단 탭 버튼 클릭 시: 해당 화면으로 슬라이드 이동 + 클릭된 탭에 active 스타일 적용
-document.addEventListener('DOMContentLoaded', function() {
-    document.querySelectorAll(".tab-btn").forEach(function(btn) {
-        btn.addEventListener("click", function() {
+document.addEventListener('DOMContentLoaded', function () {
+    document.querySelectorAll(".tab-btn").forEach(function (btn) {
+        btn.addEventListener("click", function () {
             const index = Number(btn.dataset.index);
             const screens = document.getElementById("screens");
             screens.style.transform = `translateX(-${index * 100}vw)`;
 
-            document.querySelectorAll(".tab-btn").forEach(function(b) {
+            document.querySelectorAll(".tab-btn").forEach(function (b) {
                 b.classList.remove("active");
             });
             btn.classList.add("active");

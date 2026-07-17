@@ -7,6 +7,8 @@ import jakarta.persistence.Id;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.time.LocalDateTime;
+
 @Entity
 @Getter
 @Setter
@@ -21,4 +23,6 @@ public class Run {
     private int heartRate;
     private double speedKmh;
     private double calorieBurned;
+    // 저장 시각: POST 때는 서버가 항상 자동으로 채우고, PUT 때만 값이 오면 갱신 (RunController 참고)
+    private LocalDateTime recordedAt;
 }
