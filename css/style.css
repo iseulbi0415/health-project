@@ -56,6 +56,57 @@ body {
   margin-bottom: 10px;
 }
 
+/* 컨디션 메모 — 증상 점수 슬라이더 */
+.symptom-score-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.symptom-score-row input[type="range"] {
+  flex: 1;
+  accent-color: var(--purple);
+}
+.symptom-score-edge {
+  font-size: 11px;
+  color: var(--text-gray);
+  white-space: nowrap;
+}
+.symptom-score-num {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--purple);
+  min-width: 20px;
+  text-align: center;
+  cursor: pointer;
+}
+.symptom-score-num-input {
+  width: 44px;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--purple);
+  text-align: center;
+  border: 1px solid var(--purple);
+  border-radius: 6px;
+}
+
+/* 증상-식단 인사이트 카드 */
+.insight-sub {
+  font-size: 12px;
+  color: var(--text-gray);
+  margin-bottom: 8px;
+}
+.insight-food-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+  color: var(--text-dark);
+  padding: 6px 0;
+  border-bottom: 1px solid rgba(0,0,0,0.06);
+}
+.insight-food-row:last-child { border-bottom: none; }
+
 /* ===== 화면 상단 헤더 (화면마다 색만 다르게) ===== */
 .screen-header {
   color: white;
@@ -553,6 +604,13 @@ textarea.inp {
   color: var(--purple);
   font-size: 12px;
   display: block;
+  margin-bottom: 4px;
+}
+.memo-symptom-tag {
+  display: inline-block;
+  color: var(--text-gray);
+  font-size: 11px;
+  font-weight: 600;
   margin-bottom: 4px;
 }
 #memo-list button {

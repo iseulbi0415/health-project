@@ -37,6 +37,7 @@ let selectedActivity = null;
 let memoRecords = [];
 let openMemoIndex = null;
 let editingMemoIndex = null;
+let symptomScore = 5;
 
 // 방금 롱프레스로 열렸는지 표시(quick-add 버튼은 클릭=빠른추가 동작도 겸하고 있어서,
 // 롱프레스 직후 발생하는 click을 "추가"로 오인하지 않도록 구분하는 용도)
@@ -74,6 +75,12 @@ const activityButtons = document.querySelectorAll(".activity-btn");
 const memoInput = document.getElementById("condition-memo-input");
 const memoSaveBtn = document.getElementById("memo-save-btn");
 const memoList = document.getElementById("memo-list");
+const symptomScoreSlider = document.getElementById("symptom-score-slider");
+const symptomScoreDisplay = document.getElementById("symptom-score-display");
+const symptomScoreInput = document.getElementById("symptom-score-input");
+const symptomInsightContent = document.getElementById("symptom-insight-content");
+const homeCalorieGaugeTrack = document.getElementById("home-calorie-gauge-track");
+const homeCalorieGuide = document.getElementById("home-calorie-guide");
 // ===== ③ 함수 정의 =====
 
 // --- 편집 UX 공용 헬퍼 (식단/러닝/메모 4개 목록에서 재사용) ---
@@ -112,6 +119,13 @@ function todayDateString() {
 function withUpdatedDate(recordedAt, newDateStr) {
     const timePart = recordedAt ? recordedAt.slice(10) : "T00:00:00";
     return newDateStr + timePart;
+}
+
+// 오늘로부터 n일 전 날짜를 로컬 기준 "YYYY-MM-DD"로 (todayDateString과 동일한 방식, 타임존 안전)
+function dateStringDaysAgo(n) {
+    const d = new Date();
+    d.setDate(d.getDate() - n);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
 // 롱프레스로 열린 카드 바깥을 클릭하면 자동으로 닫기
@@ -321,10 +335,16 @@ function renderFoodList() {
         document.getElementById("home-calorie-value").textContent = `${total} / ${goalCalorie} kcal`;
         const calPercent = Math.min((total / Number(goalCalorie)) * 100, 100);
         document.getElementById("home-calorie-gauge-fill").style.width = `${calPercent}%`;
+        homeCalorieGaugeTrack.style.display = "block";
+        homeCalorieGuide.style.display = "none";
     }
     else {
         document.getElementById("home-calorie-value").textContent = `${total} kcal`;
+        homeCalorieGaugeTrack.style.display = "none";
+        homeCalorieGuide.style.display = "block";
     }
+
+    renderSymptomInsight();
 }
 
 //소화 타이머 시작(또는 재개) - 넘겨받은 초부터 카운트다운
@@ -630,6 +650,83 @@ async function loadMemoRecords() {
     renderMemoList();
 }
 
+// 최근 7일 중 증상 점수가 심했던 상위 2일에 기록된 음식의 등장 빈도 계산
+// 규칙기반: 날짜 필터 → 날짜별 최고점 정렬 → 상위 N일 → 그 날 음식 빈도 집계 (AI 미사용)
+function calculateSymptomFoodInsight() {
+    const RECENT_DAYS = 7;
+    const WORST_DAY_COUNT = 2;
+    const TOP_FOOD_COUNT = 5;
+
+    const todayStr = todayDateString();
+    const startStr = dateStringDaysAgo(RECENT_DAYS - 1);
+
+    const scoreByDate = {};
+    memoRecords.forEach(function (m) {
+        const d = toDateInputValue(m.날짜);
+        if (!d || d < startStr || d > todayStr) return;
+        const score = m.증상점수 || 0;
+        if (!(d in scoreByDate) || score > scoreByDate[d]) {
+            scoreByDate[d] = score;
+        }
+    });
+
+    const worstDates = Object.keys(scoreByDate)
+        .sort(function (a, b) { return scoreByDate[b] - scoreByDate[a]; })
+        .slice(0, WORST_DAY_COUNT);
+
+    if (worstDates.length === 0) {
+        return { status: "no-memo" };
+    }
+
+    const matchedFoods = todayFoods.filter(function (f) {
+        return worstDates.indexOf(toDateInputValue(f.기록시각)) !== -1;
+    });
+
+    if (matchedFoods.length === 0) {
+        return { status: "no-food", worstDates: worstDates };
+    }
+
+    const countByName = {};
+    const triggerByName = {};
+    matchedFoods.forEach(function (f) {
+        countByName[f.이름] = (countByName[f.이름] || 0) + 1;
+        if (f.트리거) triggerByName[f.이름] = true;
+    });
+
+    const items = Object.keys(countByName)
+        .sort(function (a, b) { return countByName[b] - countByName[a]; })
+        .slice(0, TOP_FOOD_COUNT)
+        .map(function (name) {
+            return { 이름: name, 횟수: countByName[name], 트리거: !!triggerByName[name] };
+        });
+
+    return { status: "ok", worstDates: worstDates, items: items };
+}
+
+// 인사이트 카드 다시 그리기 — 음식/메모 데이터가 바뀔 때마다 renderFoodList/renderMemoList 끝에서 호출됨
+function renderSymptomInsight() {
+    const insight = calculateSymptomFoodInsight();
+
+    if (insight.status === "no-memo") {
+        symptomInsightContent.textContent = "최근 7일간 기록된 컨디션 메모가 없어요.";
+        return;
+    }
+    if (insight.status === "no-food") {
+        symptomInsightContent.textContent = `증상이 심했던 날(${insight.worstDates.join(", ")})에 기록된 음식이 없어요.`;
+        return;
+    }
+
+    const itemsHtml = insight.items.map(function (item) {
+        const tag = item.트리거 ? ` <span class="trigger-tag">⚠️ 트리거</span>` : "";
+        return `<div class="insight-food-row"><span>${item.이름}</span><span>${item.횟수}회${tag}</span></div>`;
+    }).join("");
+
+    symptomInsightContent.innerHTML = `
+        <div class="insight-sub">증상이 심했던 날: ${insight.worstDates.join(", ")}</div>
+        ${itemsHtml}
+    `;
+}
+
 function renderMemoList() {
     memoList.innerHTML = "";
 
@@ -682,7 +779,7 @@ function renderMemoList() {
 
         } else if (openMemoIndex === index) {
             // 롱프레스로 열린 상태: 수정/삭제 버튼 노출
-            card.innerHTML = `<strong>${memo.날짜}</strong><br>${memo.내용}`;
+            card.innerHTML = `<strong>${memo.날짜}</strong> <span class="memo-symptom-tag">증상 ${memo.증상점수}/10</span><br>${memo.내용}`;
             memoList.appendChild(card);
 
             const editBtn = document.createElement("button");
@@ -708,7 +805,7 @@ function renderMemoList() {
 
         } else {
             // 평소 모드: 500ms 이상 누르면 수정/삭제 버튼 노출
-            card.innerHTML = `<strong>${memo.날짜}</strong><br>${memo.내용}`;
+            card.innerHTML = `<strong>${memo.날짜}</strong> <span class="memo-symptom-tag">증상 ${memo.증상점수}/10</span><br>${memo.내용}`;
             memoList.appendChild(card);
 
             attachLongPress(card, function () {
@@ -717,6 +814,8 @@ function renderMemoList() {
             });
         }
     });
+
+    renderSymptomInsight();
 }
 
 // ===== ④ 이벤트 리스너 연결 =====
@@ -929,6 +1028,38 @@ infoSaveBtn.addEventListener("click", function () {
 });
 
 // --- 컨디션 메모 관련 이벤트 ---
+
+// 슬라이더 움직이면 숫자 표시도 같이 갱신
+symptomScoreSlider.addEventListener("input", function () {
+    symptomScore = Number(symptomScoreSlider.value);
+    symptomScoreDisplay.textContent = symptomScore;
+});
+
+// 숫자를 클릭하면 직접 입력 가능한 칸으로 전환
+symptomScoreDisplay.addEventListener("click", function () {
+    symptomScoreInput.value = symptomScore;
+    symptomScoreDisplay.style.display = "none";
+    symptomScoreInput.style.display = "inline-block";
+    symptomScoreInput.focus();
+    symptomScoreInput.select();
+});
+
+// 입력 끝나면(포커스 아웃) 1~10 범위로 정리하고 슬라이더/숫자 표시에 반영, 다시 텍스트로 전환
+function commitSymptomScoreInput() {
+    let value = Math.round(Number(symptomScoreInput.value));
+    if (!value || value < 1) value = 1;
+    if (value > 10) value = 10;
+    symptomScore = value;
+    symptomScoreSlider.value = value;
+    symptomScoreDisplay.textContent = value;
+    symptomScoreInput.style.display = "none";
+    symptomScoreDisplay.style.display = "inline-block";
+}
+symptomScoreInput.addEventListener("blur", commitSymptomScoreInput);
+symptomScoreInput.addEventListener("keydown", function (e) {
+    if (e.key === "Enter") symptomScoreInput.blur(); // blur 핸들러가 정리 로직을 처리
+});
+
 memoSaveBtn.addEventListener("click", async function () {
     if (!memoInput.value) {
         alert("메모를 작성해주세요!");
@@ -937,7 +1068,8 @@ memoSaveBtn.addEventListener("click", async function () {
 
     const newMemo = {
         날짜: todayDateString(),
-        내용: memoInput.value
+        내용: memoInput.value,
+        증상점수: symptomScore
     };
 
     const response = await fetch(`${API_BASE}/memos`, {
@@ -949,6 +1081,9 @@ memoSaveBtn.addEventListener("click", async function () {
     memoRecords.push(fromServerMemo(saved));
 
     memoInput.value = "";
+    symptomScore = 5;
+    symptomScoreSlider.value = 5;
+    symptomScoreDisplay.textContent = 5;
     renderMemoList();
 });
 

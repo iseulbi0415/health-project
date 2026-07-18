@@ -40,9 +40,10 @@
           <div id="home-calorie-box" class="hcard">
             <div id="home-calorie-title" class="hcard-title">🥗 오늘 칼로리</div>
             <div id="home-calorie-value" class="calorie-value"></div>
-            <div class="gauge-track">
+            <div id="home-calorie-gauge-track" class="gauge-track">
               <div id="home-calorie-gauge-fill" class="gauge-fill green"></div>
             </div>
+            <div id="home-calorie-guide" class="guide-text">내 정보를 입력하면 목표 대비 칼로리를 확인할 수 있어요</div>
           </div>
 
           <div id="home-run-box" class="hcard">
@@ -173,9 +174,24 @@
           <div id="condition-memo-section" class="hcard">
             <div class="sec-lbl">오늘의 컨디션 메모</div>
             <textarea id="condition-memo-input" class="inp" placeholder="오늘의 컨디션을 자유롭게 기록하세요."></textarea>
+
+            <div class="sec-lbl">오늘 증상 점수</div>
+            <div class="symptom-score-row">
+                <span class="symptom-score-edge">1(가벼움)</span>
+                <input type="range" id="symptom-score-slider" class="symptom-score-slider" min="1" max="10" step="1" value="5">
+                <span class="symptom-score-edge">10(심함)</span>
+                <span id="symptom-score-display" class="symptom-score-num">5</span>
+                <input type="number" id="symptom-score-input" class="symptom-score-num-input" min="1" max="10" step="1" style="display:none;">
+            </div>
+
             <button type="button" id="memo-save-btn" class="btn-save">메모 저장</button>
 
             <div id="memo-list"></div>
+          </div>
+
+          <div id="symptom-insight-box" class="hcard">
+            <div class="sec-lbl">🔍 이번 주 인사이트</div>
+            <div id="symptom-insight-content" class="insight-content">불러오는 중...</div>
           </div>
 
         </div>
