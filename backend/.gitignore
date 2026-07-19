@@ -31,3 +31,6 @@ build/
 
 ### VS Code ###
 .vscode/
+
+### 카카오 REST API 키/시크릿 — 절대 git에 올리면 안 됨 ###
+application-secret.properties

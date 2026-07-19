@@ -58,6 +58,11 @@ function fromServerMemo(sm) { return { id: sm.id, 날짜: sm.date, 내용: sm.co
 
 // ===== ② HTML 요소 찾아오기 =====
 
+const loginGate = document.getElementById("login-gate");
+const appShell = document.getElementById("app-shell");
+const loginNickname = document.getElementById("login-nickname");
+const logoutBtn = document.getElementById("logout-btn");
+
 const quickAddList = document.getElementById("quick-add-list");
 const foodList = document.getElementById("food-list");
 const mealCompleteBtn = document.getElementById("meal-complete-btn");
@@ -82,6 +87,22 @@ const symptomInsightContent = document.getElementById("symptom-insight-content")
 const homeCalorieGaugeTrack = document.getElementById("home-calorie-gauge-track");
 const homeCalorieGuide = document.getElementById("home-calorie-guide");
 // ===== ③ 함수 정의 =====
+
+// --- 로그인 관련 함수 ---
+
+// 로그인 상태 확인 — 로그인 됐으면 게이트를 치우고 앱을 보여주고, 아니면 게이트가 기본 상태(보임) 그대로 유지
+async function checkLoginState() {
+    const response = await fetch(`${API_BASE}/auth/me`, { credentials: "include" });
+    const data = await response.json();
+
+    if (data.loggedIn) {
+        loginNickname.textContent = `${data.nickname}님`;
+        loginGate.style.display = "none";
+        appShell.style.display = "block";
+    }
+
+    return data.loggedIn;
+}
 
 // --- 편집 UX 공용 헬퍼 (식단/러닝/메모 4개 목록에서 재사용) ---
 
@@ -217,6 +238,7 @@ function renderQuickAddList() {
 
                 const response = await fetch(`${API_BASE}/foods`, {
                     method: "POST",
+                    credentials: "include",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify(toServerFood({ ...food }))
                 });
@@ -234,7 +256,7 @@ function saveFoods() {
 
 // 서버에서 오늘 먹은 음식 목록 통째로 가져오기
 async function loadTodayFoods() {
-    const response = await fetch(`${API_BASE}/foods`);
+    const response = await fetch(`${API_BASE}/foods`, { credentials: "include" });
     const serverFoods = await response.json();
     todayFoods.length = 0;
     serverFoods.forEach(function (sf) {
@@ -271,6 +293,7 @@ function renderFoodList() {
 
                 const response = await fetch(`${API_BASE}/foods/${updated.id}`, {
                     method: "PUT",
+                    credentials: "include",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify(toServerFood(updated))
                 });
@@ -310,7 +333,7 @@ function renderFoodList() {
             });
 
             deleteBtn.addEventListener("click", async function () {
-                await fetch(`${API_BASE}/foods/${todayFoods[index].id}`, { method: "DELETE" });
+                await fetch(`${API_BASE}/foods/${todayFoods[index].id}`, { method: "DELETE", credentials: "include" });
                 todayFoods.splice(index, 1);
                 openFoodIndex = null;
                 renderFoodList();
@@ -398,7 +421,7 @@ function startDigestTimer(startSeconds, endTime, totalSeconds) {
 
 // 서버에서 러닝 기록 목록 통째로 가져오기
 async function loadRunRecords() {
-    const response = await fetch(`${API_BASE}/runs`);
+    const response = await fetch(`${API_BASE}/runs`, { credentials: "include" });
     const serverRuns = await response.json();
     runRecords.length = 0;
     serverRuns.forEach(function (sr) {
@@ -479,6 +502,7 @@ function renderRunList() {
 
                 const response = await fetch(`${API_BASE}/runs/${updated.id}`, {
                     method: "PUT",
+                    credentials: "include",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify(toServerRun(updated))
                 });
@@ -528,7 +552,7 @@ function renderRunList() {
                 });
 
                 deleteBtn.addEventListener("click", async function () {
-                    await fetch(`${API_BASE}/runs/${runRecords[index].id}`, { method: "DELETE" });
+                    await fetch(`${API_BASE}/runs/${runRecords[index].id}`, { method: "DELETE", credentials: "include" });
                     runRecords.splice(index, 1);
                     openRunIndex = null;
                     renderRunList();
@@ -641,7 +665,7 @@ function renderInfo() {
 
 // 서버에서 컨디션 메모 목록 통째로 가져오기
 async function loadMemoRecords() {
-    const response = await fetch(`${API_BASE}/memos`);
+    const response = await fetch(`${API_BASE}/memos`, { credentials: "include" });
     const serverMemos = await response.json();
     memoRecords.length = 0;
     serverMemos.forEach(function (sm) {
@@ -762,6 +786,7 @@ function renderMemoList() {
 
                 const response = await fetch(`${API_BASE}/memos/${updated.id}`, {
                     method: "PUT",
+                    credentials: "include",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify(toServerMemo(updated))
                 });
@@ -797,7 +822,7 @@ function renderMemoList() {
             });
 
             deleteBtn.addEventListener("click", async function () {
-                await fetch(`${API_BASE}/memos/${memoRecords[index].id}`, { method: "DELETE" });
+                await fetch(`${API_BASE}/memos/${memoRecords[index].id}`, { method: "DELETE", credentials: "include" });
                 memoRecords.splice(index, 1);
                 openMemoIndex = null;
                 renderMemoList();
@@ -930,6 +955,7 @@ runSaveBtn.addEventListener("click", async function () {
 
     const response = await fetch(`${API_BASE}/runs`, {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(toServerRun(newRecord))
     });
@@ -1074,6 +1100,7 @@ memoSaveBtn.addEventListener("click", async function () {
 
     const response = await fetch(`${API_BASE}/memos`, {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(toServerMemo(newMemo))
     });
@@ -1085,6 +1112,13 @@ memoSaveBtn.addEventListener("click", async function () {
     symptomScoreSlider.value = 5;
     symptomScoreDisplay.textContent = 5;
     renderMemoList();
+});
+
+// --- 로그인 관련 이벤트 ---
+// 로그아웃 후 새로고침 — 새로고침해야 login-gate가 기본 표시 상태로 다시 시작함
+logoutBtn.addEventListener("click", async function () {
+    await fetch(`${API_BASE}/auth/logout`, { method: "POST", credentials: "include" });
+    window.location.reload();
 });
 
 // --- 편집 UX 공용: 롱프레스로 열린 카드 바깥 클릭 시 닫기 ---
@@ -1113,24 +1147,31 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 
 // ===== ⑤ 초기 실행 =====
-renderQuickAddList();
-loadTodayFoods();   // renderFoodList()는 이 함수 안에서 자동으로 호출됨
-loadRunRecords();   // renderRunList()는 이 함수 안에서 자동으로 호출됨
-renderInfo();
-loadMemoRecords();  // renderMemoList()는 이 함수 안에서 자동으로 호출됨
 
-// 페이지 열릴때: 저장된 소화 타이머가 있으면 남은 시간을 계산해서 이어서 시작
-const savedEndTime = localStorage.getItem("digestEndTime");
-if (savedEndTime) {
-    const remaining = Math.round((Number(savedEndTime) - Date.now()) / 1000);
-    const savedTotal = Number(localStorage.getItem("digestTotalSeconds"));
-    if (remaining > 0) {
-        startDigestTimer(remaining, Number(savedEndTime), savedTotal);
+// 로그인 안 했으면 login-gate가 이미 보이는 상태로 대기 — 데이터 로드 자체를 생략함
+// (안 그러면 401 응답을 파싱하려다 콘솔 에러만 남고, 게이트에 가려 안 보이는 화면 데이터를 미리 불러오는 낭비이기도 함)
+checkLoginState().then(function (loggedIn) {
+    if (!loggedIn) return;
+
+    renderQuickAddList();
+    loadTodayFoods();   // renderFoodList()는 이 함수 안에서 자동으로 호출됨
+    loadRunRecords();   // renderRunList()는 이 함수 안에서 자동으로 호출됨
+    renderInfo();
+    loadMemoRecords();  // renderMemoList()는 이 함수 안에서 자동으로 호출됨
+
+    // 페이지 열릴때: 저장된 소화 타이머가 있으면 남은 시간을 계산해서 이어서 시작
+    const savedEndTime = localStorage.getItem("digestEndTime");
+    if (savedEndTime) {
+        const remaining = Math.round((Number(savedEndTime) - Date.now()) / 1000);
+        const savedTotal = Number(localStorage.getItem("digestTotalSeconds"));
+        if (remaining > 0) {
+            startDigestTimer(remaining, Number(savedEndTime), savedTotal);
+        }
+        else {
+            localStorage.removeItem("digestEndTime");
+            localStorage.removeItem("digestTotalSeconds");
+            document.getElementById("digest-warning").textContent = "소화 완료! 이제 누우셔도 됩니다!";
+            document.getElementById("home-digest-warning").textContent = "소화 완료! 이제 누우셔도 됩니다!";
+        }
     }
-    else {
-        localStorage.removeItem("digestEndTime");
-        localStorage.removeItem("digestTotalSeconds");
-        document.getElementById("digest-warning").textContent = "소화 완료! 이제 누우셔도 됩니다!";
-        document.getElementById("home-digest-warning").textContent = "소화 완료! 이제 누우셔도 됩니다!";
-    }
-}
+});

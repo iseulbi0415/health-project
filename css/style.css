@@ -34,6 +34,53 @@ body {
 .blob2 { width: 240px; height: 240px; background: #a8e6c1; bottom: 120px; right: -70px; }
 .blob3 { width: 200px; height: 200px; background: #f5c79c; bottom: -80px; left: 20%; }
 
+/* ===== 로그인 게이트 (로그인 전 앱 전체를 덮는 화면) =====
+   다른 화면들의 파스텔 배경과 다르게, .screen-header들이 쓰는 진한 그라디언트를
+   이어붙여 "표지" 느낌을 냄 — 글래스모피즘 톤은 유지하되 배경만 진하게 해서
+   로그인 화면이라는 게 시각적으로 구분되게 함 */
+#login-gate {
+  position: fixed;
+  inset: 0;
+  z-index: 999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(160deg, #1c2b4a 0%, #2c5fb3 45%, #4c2a8a 100%);
+  padding: 24px;
+}
+.login-gate-card {
+  width: 100%;
+  max-width: 340px;
+  text-align: center;
+  background: rgba(255,255,255,0.12);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border: 1px solid rgba(255,255,255,0.25);
+  border-radius: 24px;
+  padding: 40px 28px;
+  box-shadow: 0 20px 50px rgba(0,0,0,0.35);
+}
+.login-gate-emoji { font-size: 42px; margin-bottom: 14px; }
+.login-gate-title { font-size: 20px; font-weight: 700; color: white; margin-bottom: 8px; }
+.login-gate-sub { font-size: 13px; color: rgba(255,255,255,0.75); margin-bottom: 28px; }
+
+/* 카카오 브랜드 가이드라인 권장 버튼 색상(#FEE500) — 게이트 화면은 진한 톤이지만
+   로그인 버튼 자체는 사용자가 "카카오 로그인"으로 바로 인지하도록 카카오 고유색 유지 */
+.btn-kakao {
+  display: block;
+  width: 100%;
+  padding: 14px;
+  background: #FEE500;
+  color: #191600;
+  font-size: 15px;
+  font-weight: 700;
+  border-radius: 12px;
+  text-decoration: none;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.2);
+  transition: transform 0.15s;
+}
+.btn-kakao:active { transform: scale(0.97); }
+
 /* ===== 글래스모피즘 카드 (모든 화면 공통으로 재사용) ===== */
 .hcard {
   background: rgba(255,255,255,0.72);
