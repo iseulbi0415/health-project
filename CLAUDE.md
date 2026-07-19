@@ -30,18 +30,21 @@
 
 ## 기술 스택
 - **프론트엔드**: HTML/CSS/JS (모노레포 루트)
-- **백엔드**: Spring Boot (Maven, Java 17, Spring Web + JPA + MySQL Driver + Lombok), `backend/` 서브폴더
+- **백엔드**: Spring Boot (Maven, Java 17, Spring Web + JPA + MySQL Driver + Lombok + Security + OAuth2 Client), `backend/` 서브폴더
 - **DB**: MySQL (`health_project`), Homebrew로 설치
+- **인증**: 카카오 소셜 로그인 (Spring Security OAuth2 Client, 세션 기반)
 - **버전관리**: GitHub (`iseulbi0415/health-project`)
 - **에디터**: VS Code(프론트) + IntelliJ(백엔드)
 
-## 현재 진행 상황 (2026-07-17 기준)
+## 현재 진행 상황 (2026-07-19 기준)
 - 프론트엔드 완성, D안(리퀴드 글래스 탭형, 하단 탭바 4화면) 디자인 적용 완료
-- 백엔드 Food/Run/Memo 3종 Entity+Repository+Controller 완성
-- CRUD(POST/GET/PUT/DELETE) 전체 구현, CORS 설정 완료
-- 프론트 전체를 `localStorage` → `fetch` 기반으로 전환 완료, 브라우저 테스트 통과
-- 트리거 음식 필드(`isTrigger`) 추가 중 — Food.java, DB 컬럼, HTML 체크박스, foods 배열 저장까지 완료했으나
-  **"오늘 먹은 음식" 목록에 트리거 태그가 화면에 안 뜨는 버그가 있음 (디버깅 필요)**
+- 백엔드 Food/Run/Memo 3종 Entity+Repository+Controller 완성, CRUD(POST/GET/PUT/DELETE) 전체 구현
+- 프론트 전체를 `localStorage` → `fetch` 기반으로 전환 완료
+- 롱프레스 편집 UX, 증상 점수 입력 + 증상-식단 인사이트 기능 완료
+- **카카오 소셜 로그인(OAuth2) 추가 완료** — 로그인 게이트(비로그인 시 앱 전체를 가리는 전체화면) 방식,
+  Food/Run/Memo가 로그인한 사용자 기준으로 분리 저장/조회됨 (`user_id` 연관관계 + 소유권 검증)
+  - 실행 전 `backend/src/main/resources/application-secret.properties`에 실제 카카오 REST API 키/Client Secret 입력 필요(git 미포함)
+- **로그아웃 즉시 반영 안 되는 버그 수정 완료** — 원인은 CORS 두 겹: ① `/api/auth/logout`은 컨트롤러가 아니라 Security가 직접 처리하는 경로라 `@CrossOrigin`이 안 먹혀서 CORS 헤더 누락 → `SecurityConfig`에 `CorsConfigurationSource` 빈 하나로 통일해 해결. ② 그 후에도 로그아웃 성공 시 서버가 프론트 주소로 리다이렉트를 보내고 있었는데, `fetch`가 이 리다이렉트를 자동으로 따라가다 Live Server(정적 파일 서버, CORS 미지원) 응답을 못 읽어 fetch 자체가 실패 → 로그아웃 성공 핸들러가 리다이렉트 대신 200만 반환하도록 변경해 해결
 
 ## 제출 전 정리 백로그 (대회 마감 전 최종 단계에서 처리, 지금 당장 안 해도 됨)
 - mockup_D_final.html 등 확정 전 디자인 목업 파일 삭제
@@ -56,6 +59,8 @@
 - "오늘 먹은 음식"(`todayFoods`)이 날짜 구분 없이 계속 쌓이기만 함 — 하루 단위로 관리되도록 개선 필요
 - 러닝 칼로리 계산에 임시 체중값(60kg) 대신 실제 입력 체중 연동 필요
 - CSS 테마 전환 기능(다크/파스텔) — 추후 구현 예정
+- CSRF 보호 비활성화 상태(`SecurityConfig`) — 로컬 데모 범위라 우선 꺼둠, 배포 전 토큰 방식으로 전환 필요
+- 로그아웃해도 카카오 자체 로그인 세션(브라우저에 남은 카카오 로그인 상태)까지는 안 끊김 — OAuth2 SSO의 정상 동작이라 버그는 아니지만, 필요하면 매번 강제 재인증시키는 방식을 추가 조사 가능 (우선순위 낮음)
 
 ## 코딩 컨벤션
 - 커밋 메시지: `feat:` / `fix:` / `docs:` / `style:` 컨벤션 준수
