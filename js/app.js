@@ -1,7 +1,12 @@
 // ===== ① 데이터 =====
 
 // 서버 주소 (백엔드가 살아있는 곳)
-const API_BASE = "http://localhost:8080/api";
+// 로컬(Live Server, localhost)에서 열었으면 로컬 백엔드를, 배포(Vercel)에서 열었으면
+// 배포된 Railway 백엔드를 자동으로 봄
+const BACKEND_ORIGIN = window.location.hostname === "localhost"
+    ? "http://localhost:8080"
+    : "https://health-project-production-5204.up.railway.app";
+const API_BASE = `${BACKEND_ORIGIN}/api`;
 
 // --- 식단: 자주 먹는 음식 관련 ---
 const foods = JSON.parse(localStorage.getItem("foods")) || [
@@ -62,6 +67,7 @@ const loginGate = document.getElementById("login-gate");
 const appShell = document.getElementById("app-shell");
 const loginNickname = document.getElementById("login-nickname");
 const logoutBtn = document.getElementById("logout-btn");
+const kakaoLoginLink = document.getElementById("kakao-login-link");
 
 const quickAddList = document.getElementById("quick-add-list");
 const foodList = document.getElementById("food-list");
@@ -1147,6 +1153,12 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 
 // ===== ⑤ 초기 실행 =====
+
+// index.html의 카카오 로그인 링크는 기본값이 배포 주소로 박혀있음(배포 환경에서 안전한 기본값) —
+// 로컬(localhost)에서 열었을 때만 로컬 백엔드 주소로 되돌림
+if (window.location.hostname === "localhost") {
+    kakaoLoginLink.href = `${BACKEND_ORIGIN}/oauth2/authorization/kakao`;
+}
 
 // 로그인 안 했으면 login-gate가 이미 보이는 상태로 대기 — 데이터 로드 자체를 생략함
 // (안 그러면 401 응답을 파싱하려다 콘솔 에러만 남고, 게이트에 가려 안 보이는 화면 데이터를 미리 불러오는 낭비이기도 함)

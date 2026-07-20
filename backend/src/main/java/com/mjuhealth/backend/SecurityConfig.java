@@ -1,5 +1,6 @@
 package com.mjuhealth.backend;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpStatus;
@@ -18,9 +19,13 @@ import java.util.List;
 public class SecurityConfig {
 
     private final KakaoOAuth2UserService kakaoOAuth2UserService;
+    private final String frontendUrl;
 
-    public SecurityConfig(KakaoOAuth2UserService kakaoOAuth2UserService) {
+    public SecurityConfig(
+            KakaoOAuth2UserService kakaoOAuth2UserService,
+            @Value("${app.frontend-url}") String frontendUrl) {
         this.kakaoOAuth2UserService = kakaoOAuth2UserService;
+        this.frontendUrl = frontendUrl;
     }
 
     @Bean
@@ -46,9 +51,9 @@ public class SecurityConfig {
                 new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED), apiMatcher))
             .oauth2Login(oauth2 -> oauth2
                 .userInfoEndpoint(userInfo -> userInfo.userService(kakaoOAuth2UserService))
-                // 로그인 처리는 백엔드(8080)에서 일어나지만 화면은 프론트(5500)에 있어서
-                // 로그인 성공 후 프론트 주소로 명시적으로 돌려보내야 함(기본값은 8080 루트라 빈 화면이 뜸)
-                .successHandler((req, res, auth) -> res.sendRedirect("http://localhost:5500/index.html"))
+                // 로그인 처리는 백엔드에서 일어나지만 화면은 프론트에 있어서
+                // 로그인 성공 후 프론트 주소(app.frontend-url, 로컬/배포에 따라 달라짐)로 명시적으로 돌려보내야 함
+                .successHandler((req, res, auth) -> res.sendRedirect(frontendUrl + "/index.html"))
             )
             .logout(logout -> logout
                 .logoutUrl("/api/auth/logout")
@@ -69,7 +74,7 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-        config.setAllowedOrigins(List.of("http://localhost:5500"));
+        config.setAllowedOrigins(List.of(frontendUrl));
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
         config.setAllowCredentials(true);
