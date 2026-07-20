@@ -13,24 +13,17 @@
 │   프론트엔드          │  ───────────────────────────►    │   백엔드 (Spring Boot)     │  ─────────────►    │   MySQL     │
 │   HTML/CSS/JS         │  ◄───────────────────────────    │   localhost:8080          │  ◄─────────────    │  health_project │
 │   (localhost:5500)    │                                   │                            │                     │             │
-└─────────────────────┘                                   └───────────┬──────────────┘                     └─────────────┘
-                                                                        │ OAuth2 인가 코드 교환
-                                                                        ▼
-                                                              ┌──────────────────────────┐
-                                                              │   카카오 인증 서버          │
-                                                              │   (kauth/kapi.kakao.com)  │
-                                                              └──────────────────────────┘
+└─────────────────────┘                                   └──────────────────────────┘                     └─────────────┘
 ```
+로그인 시 백엔드가 카카오 인증 서버(`kauth`/`kapi.kakao.com`)와 별도로 통신해 인가 코드를 사용자 정보로 교환한다 — 흐름은 2-0 참고.
 
 | 계층 | 기술 | 역할 |
 |---|---|---|
-| 프론트엔드 | HTML / CSS / JS (바닐라, 프레임워크 없음) | 화면 렌더링, 사용자 입력 수집, `fetch`로 백엔드 API 호출(세션 쿠키 포함, `credentials: "include"`), 계산 로직(BMR/TDEE, MET 칼로리 등) 실행, 로그인 게이트(비로그인 시 앱 전체를 가림) |
-| 백엔드 | Spring Boot 4.x (Java 17, Maven) — Web + JPA + MySQL Driver + Lombok + Security + OAuth2 Client | REST API 제공(`@RestController`), 요청 검증/위임(`Controller`), DB 접근(`Repository`, Spring Data JPA), Entity ↔ JSON 자동 변환(Jackson), 카카오 OAuth2 로그인 처리 및 세션 관리(`SecurityConfig`) |
-| DB | MySQL (`health_project` 스키마) | 데이터 영구 저장. 테이블은 Hibernate가 Entity 클래스로부터 자동 생성/갱신 (`spring.jpa.hibernate.ddl-auto=update`) |
+| 프론트엔드 | HTML / CSS / JS (바닐라, 프레임워크 없음) | 화면 렌더링, 입력 수집, `fetch` API 호출(`credentials: "include"`), BMR/TDEE·MET 칼로리 등 계산, 로그인 게이트 |
+| 백엔드 | Spring Boot 4.x (Java 17, Maven) — Web + JPA + MySQL Driver + Lombok + Security + OAuth2 Client | REST API, DB 접근(Spring Data JPA), Entity ↔ JSON 변환(Jackson), 카카오 로그인·세션 관리(`SecurityConfig`) |
+| DB | MySQL (`health_project` 스키마) | 데이터 영구 저장, `ddl-auto=update`로 Entity 기준 자동 생성/갱신 |
 
-**계층 간 경계가 명확한 이유**: 프론트는 DB 존재 자체를 모르고 오직 REST API만 알고, 백엔드는 화면 구성을 모르고 오직 Entity/JSON만 다룬다. 덕분에 프론트를 나중에 다른 프레임워크로 바꾸거나, DB를 교체해도 서로에게 영향이 적다.
-
-**로그인 흐름 요약**: 사용자가 "카카오로 로그인" 클릭 → 백엔드(`/oauth2/authorization/kakao`)가 카카오 로그인 페이지로 리다이렉트 → 로그인 성공 시 카카오가 백엔드(`/login/oauth2/code/kakao`)로 콜백 → 백엔드가 카카오 인증 서버에서 사용자 정보(고유 ID, 닉네임)를 받아와 `User` 테이블에 저장/조회 → 세션(쿠키)을 발급하고 프론트(`localhost:5500`)로 다시 리다이렉트. 이후 모든 `/api/**` 요청은 이 세션 쿠키로 로그인 여부를 판단한다.
+**계층 분리 이유**: 프론트는 DB를 모르고 REST API만, 백엔드는 화면 구성을 모르고 Entity/JSON만 다룸 — 서로 독립적으로 교체 가능.
 
 ### 계층별 실행 방법
 - 프론트: 정적 파일 서버 (VS Code Live Server, `localhost:5500`)
@@ -44,22 +37,24 @@
 공통 사항
 - Base URL: `http://localhost:8080/api`
 - 모든 응답은 `Content-Type: application/json;charset=UTF-8`
-- CORS: `SecurityConfig`의 `CorsConfigurationSource` 빈으로 전체 경로(`/**`)에 일괄 적용 — 프론트 주소(`http://localhost:5500`)만 허용 + 세션 쿠키 전달 허용(`allowCredentials`). 로그인 세션이 쿠키 기반이라, CORS 스펙상 `allowCredentials`와 와일드카드(`*`) 출처는 함께 쓸 수 없어서 출처를 프론트 주소로 명시함. 원래는 컨트롤러마다 `@CrossOrigin`을 붙였는데, `@CrossOrigin`은 실제 `@RequestMapping` 핸들러가 있는 경로에만 적용돼서 Spring Security가 직접 처리하는 `/api/auth/logout` 같은 경로엔 CORS 헤더가 아예 안 붙는 문제가 있었음 — 빈 하나로 통일해 이 문제를 해결함
-- **인증 필요**: `/api/auth/me`를 제외한 모든 `/api/**` 요청은 카카오 로그인 세션이 있어야 함(`SecurityConfig`). 로그인 안 된 상태로 호출하면 401 응답
-- id는 서버가 자동 생성(`GenerationType.IDENTITY`) — 요청 바디에 넣어도 무시됨(POST 기준)
-- Food/Run/Memo는 모두 `user`(로그인한 사용자) 연관관계를 가지며, 요청 바디에 넣을 필요 없이 서버가 로그인 세션에서 자동으로 채움 — 자세한 내용은 2-0 참고
+- CORS: `SecurityConfig`의 `CorsConfigurationSource` 빈으로 `/**` 전체에 일괄 적용(허용 출처 `http://localhost:5500`, `allowCredentials: true`) — 컨트롤러별 `@CrossOrigin`은 Security가 직접 가로채는 경로(로그아웃 등)엔 안 먹혀서 빈 하나로 통일
+- **인증 필요**: `/api/auth/me` 제외 모든 `/api/**`는 카카오 로그인 세션 필요, 비로그인 호출 시 401
+- id는 서버 자동 생성(`GenerationType.IDENTITY`) — 요청 바디에 넣어도 무시됨(POST 기준)
+- Food/Run/Memo는 모두 `user`(로그인한 사용자) 연관관계를 가짐 — 요청 바디에 안 넣어도 서버가 세션에서 자동으로 채움 (2-0 참고)
 
 ### 2-0. Auth (카카오 로그인)
 
+국내 서비스라 카카오 로그인 채택. `Spring Security OAuth2 Client` 기반, 세션(쿠키) 방식.
+
 | 엔드포인트 | 메서드 | 설명 |
 |---|---|---|
-| `/oauth2/authorization/kakao` | GET (브라우저 이동) | 카카오 로그인 페이지로 리다이렉트 — 프론트에서 `<a href>`로 이동시켜야 함(`fetch` 금지, 리다이렉트를 JSON으로 파싱하려다 깨짐) |
-| `/api/auth/me` | GET | 현재 로그인 상태 확인. `{"loggedIn": false}` 또는 `{"loggedIn": true, "nickname": "..."}` |
-| `/api/auth/logout` | POST | 로그아웃(세션 무효화), 200만 반환 — 리다이렉트는 안 함(아래 참고) |
+| `/oauth2/authorization/kakao` | GET (`<a href>` 이동, `fetch` 금지) | 카카오 로그인 페이지로 리다이렉트 |
+| `/api/auth/me` | GET | 로그인 상태 확인 — `{"loggedIn": false}` / `{"loggedIn": true, "nickname": "..."}` |
+| `/api/auth/logout` | POST | 로그아웃(세션 무효화), 200만 반환 |
 
-카카오 로그인 성공 시 서버가 `User`(고유 카카오 ID, 닉네임)를 찾거나 새로 만들고, 그 사용자의 로그인 세션을 쿠키로 발급한다. 컨트롤러는 `@AuthenticationPrincipal KakaoOAuth2User principal`로 현재 로그인한 사용자를 받는다.
-
-> ⚠️ **로그인은 리다이렉트, 로그아웃은 리다이렉트 안 함 — 이유**: 로그인은 `<a href>`로 시작하는 실제 브라우저 이동이라 성공 후 서버가 프론트 주소로 리다이렉트해도 문제없다. 반면 로그아웃은 프론트가 `fetch`로 호출하는데, 여기서 서버가 리다이렉트를 보내면 `fetch`가 그 리다이렉트를 자동으로 따라가다 Live Server(정적 파일 서버, CORS 미지원)의 응답을 읽지 못해 `fetch` 자체가 실패해버린다(실제로 겪은 버그). 그래서 로그아웃은 200만 반환하고, 화면 전환(로그인 게이트로 복귀)은 프론트 JS가 `window.location.reload()`로 직접 처리한다.
+- 로그인 흐름: 카카오 콜백(`/login/oauth2/code/kakao`) → `KakaoOAuth2UserService`가 `User` 조회/생성 → 세션 발급 → 프론트로 리다이렉트
+- 컨트롤러는 `@AuthenticationPrincipal KakaoOAuth2User principal`로 로그인 사용자를 받음
+- 로그인은 리다이렉트, 로그아웃은 200만 반환 — 로그인(`<a href>` 실이동)은 리다이렉트 가능하지만, 로그아웃(`fetch`)은 리다이렉트를 따라가다 Live Server(CORS 미지원)에서 막혀 실패하기 때문(겪었던 버그). 화면 전환은 프론트가 `reload()`로 직접 처리
 
 ### 2-1. Food (식단 기록)
 
@@ -96,7 +91,7 @@
 
 > ⚠️ **`isTrigger`/`trigger` 중복 키에 대한 설계 노트**: `Food.java`의 `isTrigger` 필드는 Lombok `@Getter`가 `isTrigger()`라는 getter를 생성하는데, Jackson은 boolean getter `isXxx()`를 프로퍼티명 `xxx`로 해석하는 규칙이 있어 기본값으로는 JSON 키가 `trigger`가 되어버린다. 프론트(`app.js`)는 `isTrigger`라는 키를 기대하므로 필드에 `@JsonProperty("isTrigger")`를 명시적으로 붙여 이름을 고정했다. 다만 Lombok이 만든 `isTrigger()` getter 자체는 여전히 별도 프로퍼티로 잡혀서 응답에 `trigger` 키가 중복으로 따라 나온다 — 프론트는 이 여분 키를 그냥 무시하므로 기능엔 문제없지만, 정석대로 정리하려면 필드명을 `trigger`로 바꾸고 `@Column(name="is_trigger")`로 DB 컬럼명만 유지하는 방법이 있다 (지금은 최소 변경 원칙에 따라 보류). 자세한 원인은 3번 섹션 참고.
 
-> ⚠️ **소유권 검증 (PUT/DELETE)**: `id`는 순차 증가하는 값이라 다른 사용자가 URL의 id만 바꿔서 남의 기록에 접근을 시도할 수 있다. `FoodController.updateFood`/`deleteFood`는 수정·삭제 전에 기존 레코드의 `user`가 현재 로그인한 사용자와 같은지 확인하고, 다르면 403을 반환한다. 또한 PUT 요청 바디에 다른 `user` 값을 넣어 소유권 자체를 넘기는 것을 막기 위해, 검증 후 `user` 필드는 요청 바디 값을 무시하고 기존 소유자로 강제 고정한다.
+> ⚠️ **소유권 검증 (PUT/DELETE)**: 수정·삭제 전 기존 레코드의 `user`가 로그인 사용자와 같은지 확인, 다르면 403(id 추측 접근 방지). 검증 후 `user`는 요청 바디 값을 무시하고 기존 소유자로 고정(바디 위조로 소유권 이전 방지).
 
 ### 2-2. Run (러닝 기록)
 
@@ -224,4 +219,4 @@ food/run/memo는 서로 외래키로 연결되어 있지 않지만(각 기록이
 - PK는 모두 `id` (BIGINT, AUTO_INCREMENT) — JPA `@GeneratedValue(strategy = GenerationType.IDENTITY)`
 - 컬럼명은 Java 필드명(camelCase)을 Hibernate가 자동으로 snake_case 변환한 것 (예: `isTrigger` → `is_trigger`, `speedKmh` → `speed_kmh`)
 - 테이블은 코드로 직접 만든 게 아니라 `spring.jpa.hibernate.ddl-auto=update` 설정으로 Entity 클래스를 기준으로 Hibernate가 자동 생성/갱신함 — 즉 **Entity 클래스(Food.java 등)가 곧 DB 스키마의 원본(source of truth)**
-- `user_id`는 `@ManyToOne(optional = false) @JoinColumn(name = "user_id", nullable = false)`로 선언되어 NOT NULL — 카카오 로그인 도입 시점에 기존 테스트 데이터를 모두 삭제하고 시작했기 때문에 처음부터 NOT NULL로 추가 가능했음(기존 행이 있었다면 Hibernate가 컬럼 추가 시 실패했을 것)
+- `user_id`는 `@ManyToOne(optional = false)`로 NOT NULL — 카카오 로그인 도입 시 기존 테스트 데이터를 삭제하고 시작해서 처음부터 NOT NULL로 추가 가능했음
