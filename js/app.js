@@ -1076,7 +1076,16 @@ calendarAddRunBtn.addEventListener("click", function () {
 calendarAddMemoBtn.addEventListener("click", function () {
     setPendingCalendarDate(selectedCalendarDate, memoDateTargetBanner);
     document.querySelector('.tab-btn[data-index="3"]').click();
-    document.getElementById("condition-memo-section").scrollIntoView({ behavior: "smooth" });
+
+    // scrollIntoView()는 조상 스크롤 컨테이너를 전부 훑는데, 4개 화면이 transform: translateX로
+    // 좌우 배치된 이 캐러셀 구조에서는 .screen-wrap(overflow:hidden, 탭 틀)의 스크롤 위치까지
+    // 잘못 건드려서 방금 바뀐 탭 전환 transform과 충돌 — 화면이 순간 하얗게 보이는 원인이었음.
+    // 그래서 내 정보 화면 자신의 세로 스크롤만 직접 계산해서 이동함. 두 요소의 getBoundingClientRect
+    // 차이를 쓰면 .screens에 걸린 transform 값이 얼마든 상쇄돼서 위 문제와 무관하게 항상 정확함
+    const infoScreen = document.querySelector(".info-screen");
+    const memoSection = document.getElementById("condition-memo-section");
+    const targetTop = memoSection.getBoundingClientRect().top - infoScreen.getBoundingClientRect().top + infoScreen.scrollTop;
+    infoScreen.scrollTo({ top: targetTop, behavior: "smooth" });
 });
 
 // "식사 완료" 버튼 클릭 시: 가장 오래 걸리는 소화시간을 찾아서 끝나는 시각을 저장하고 타이머 시작
