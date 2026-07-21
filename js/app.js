@@ -764,16 +764,28 @@ function renderMemoList() {
         const card = document.createElement("div");
 
         if (editingMemoIndex === index) {
-            // 수정 모드 — 날짜/내용 둘 다 수정 가능
+            // 수정 모드 — 날짜/내용/증상점수 다 수정 가능
             // type="date" 네이티브 달력 위젯 사용: 자유 텍스트로 두면 아무 글자나 입력되는 문제가 있어
             // 유효한 날짜만 고를 수 있도록 강제함. 기존 한국어 포맷 기록도 toDateInputValue로 변환해 채움
+            // 증상점수는 기존 슬라이더 스타일(.symptom-score-row 등)을 그대로 재사용 — 새로 만들 땐 있었는데
+            // 수정 폼엔 빠져있어서 수정할 때마다 기존 값이 그대로 재전송되던 게 이번에 고친 버그
             card.innerHTML = `
                 <input type="date" class="inp edit-memo-date-input" value="${toDateInputValue(memo.날짜)}">
                 <textarea class="inp edit-memo-input">${memo.내용}</textarea>
+                <div class="symptom-score-row">
+                    <span class="symptom-score-edge">1(가벼움)</span>
+                    <input type="range" class="edit-memo-score-input" min="1" max="10" step="1" value="${memo.증상점수}">
+                    <span class="symptom-score-edge">10(심함)</span>
+                    <span class="symptom-score-num edit-memo-score-display">${memo.증상점수}</span>
+                </div>
                 <button type="button" class="btn-save-small">저장</button>
                 <button type="button" class="btn-cancel-small">취소</button>
             `;
             memoList.appendChild(card);
+
+            card.querySelector(".edit-memo-score-input").addEventListener("input", function () {
+                card.querySelector(".edit-memo-score-display").textContent = this.value;
+            });
 
             card.querySelector(".btn-save-small").addEventListener("click", async function () {
                 if (!card.querySelector(".edit-memo-date-input").value) {
@@ -787,7 +799,8 @@ function renderMemoList() {
                 const updated = {
                     ...memo,
                     날짜: card.querySelector(".edit-memo-date-input").value,
-                    내용: card.querySelector(".edit-memo-input").value
+                    내용: card.querySelector(".edit-memo-input").value,
+                    증상점수: Number(card.querySelector(".edit-memo-score-input").value)
                 };
 
                 const response = await fetch(`${API_BASE}/memos/${updated.id}`, {
