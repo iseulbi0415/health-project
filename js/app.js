@@ -127,6 +127,7 @@ const homeCalorieGuide = document.getElementById("home-calorie-guide");
 // 로그인 상태 확인 — 응답 오기 전까진 loading-screen만 보이는 상태(기본값)라 login-gate가
 // "잠깐 보였다 사라지는" 깜빡임이 없음. 응답이 오면 결과에 맞는 화면만 보여줌
 async function checkLoginState() {
+    // /auth/me는 SecurityConfig에서 permitAll이라 401이 나지 않는 별개 성격의 호출이라 apiFetch를 쓰지 않음
     const response = await fetch(`${API_BASE}/auth/me`, { credentials: "include" });
     const data = await response.json();
 
@@ -140,6 +141,26 @@ async function checkLoginState() {
     }
 
     return data.loggedIn;
+}
+
+// 세션 만료 시 공통 처리 — 조용히 실패해서 사용자가 "왜 안 되지" 하다 직접 새로고침해야만
+// 알게 되던 문제를 없애기 위해, 안내와 함께 그 자리에서 바로 로그인 게이트로 전환함
+function handleSessionExpired() {
+    alert("로그인이 만료되었습니다. 다시 로그인해주세요.");
+    appShell.style.display = "none";
+    loginGate.style.display = "flex";
+}
+
+// 인증이 필요한 API 호출 전용 fetch 래퍼 — 응답이 401이면 매 호출부마다 따로 체크하지 않고
+// 여기서 한 번에 세션 만료 처리를 하고, 호출부가 이어서 response.json() 등을 실행하지 않도록
+// 에러를 던져서 그 자리에서 멈춤(별도 try/catch 없이도 각 이벤트 핸들러가 자연스럽게 중단됨)
+async function apiFetch(url, options) {
+    const response = await fetch(url, { credentials: "include", ...options });
+    if (response.status === 401) {
+        handleSessionExpired();
+        throw new Error("세션 만료로 요청 중단: " + url);
+    }
+    return response;
 }
 
 // --- 편집 UX 공용 헬퍼 (식단/러닝/메모 4개 목록에서 재사용) ---
@@ -280,7 +301,7 @@ function renderQuickAddList() {
                     foodToSave.기록시각 = dateWithCurrentTime(pendingCalendarDate);
                 }
 
-                const response = await fetch(`${API_BASE}/foods`, {
+                const response = await apiFetch(`${API_BASE}/foods`, {
                     method: "POST",
                     credentials: "include",
                     headers: { "Content-Type": "application/json" },
@@ -307,7 +328,7 @@ function saveFoods() {
 
 // 서버에서 오늘 먹은 음식 목록 통째로 가져오기
 async function loadTodayFoods() {
-    const response = await fetch(`${API_BASE}/foods`, { credentials: "include" });
+    const response = await apiFetch(`${API_BASE}/foods`, { credentials: "include" });
     const serverFoods = await response.json();
     todayFoods.length = 0;
     serverFoods.forEach(function (sf) {
@@ -342,7 +363,7 @@ function renderFoodList() {
                 const newCalorie = Number(card.querySelector(".edit-calorie-input").value);
                 const updated = { ...todayFoods[index], 이름: newName, 칼로리: newCalorie };
 
-                const response = await fetch(`${API_BASE}/foods/${updated.id}`, {
+                const response = await apiFetch(`${API_BASE}/foods/${updated.id}`, {
                     method: "PUT",
                     credentials: "include",
                     headers: { "Content-Type": "application/json" },
@@ -384,7 +405,7 @@ function renderFoodList() {
             });
 
             deleteBtn.addEventListener("click", async function () {
-                await fetch(`${API_BASE}/foods/${todayFoods[index].id}`, { method: "DELETE", credentials: "include" });
+                await apiFetch(`${API_BASE}/foods/${todayFoods[index].id}`, { method: "DELETE", credentials: "include" });
                 todayFoods.splice(index, 1);
                 openFoodIndex = null;
                 renderFoodList();
@@ -501,7 +522,7 @@ function clearPendingCalendarDate() {
 
 // 서버에서 해당 월의 "기록 있는 날짜" 목록을 받아와 달력을 다시 그림
 async function loadCalendarSummary(year, month) {
-    const response = await fetch(`${API_BASE}/records/summary?year=${year}&month=${month}`, { credentials: "include" });
+    const response = await apiFetch(`${API_BASE}/records/summary?year=${year}&month=${month}`, { credentials: "include" });
     const dates = await response.json();
     calendarMarkedDates = new Set(dates);
     renderCalendar();
@@ -550,9 +571,9 @@ async function loadCalendarDetail(dateStr) {
     calendarDetailContent.innerHTML = "불러오는 중...";
 
     const [foodRes, runRes, memoRes] = await Promise.all([
-        fetch(`${API_BASE}/foods?date=${dateStr}`, { credentials: "include" }),
-        fetch(`${API_BASE}/runs?date=${dateStr}`, { credentials: "include" }),
-        fetch(`${API_BASE}/memos?date=${dateStr}`, { credentials: "include" })
+        apiFetch(`${API_BASE}/foods?date=${dateStr}`, { credentials: "include" }),
+        apiFetch(`${API_BASE}/runs?date=${dateStr}`, { credentials: "include" }),
+        apiFetch(`${API_BASE}/memos?date=${dateStr}`, { credentials: "include" })
     ]);
     const dayFoods = (await foodRes.json()).map(fromServerFood);
     const dayRuns = (await runRes.json()).map(fromServerRun);
@@ -591,7 +612,7 @@ async function loadCalendarDetail(dateStr) {
 
 // 서버에서 러닝 기록 목록 통째로 가져오기
 async function loadRunRecords() {
-    const response = await fetch(`${API_BASE}/runs`, { credentials: "include" });
+    const response = await apiFetch(`${API_BASE}/runs`, { credentials: "include" });
     const serverRuns = await response.json();
     runRecords.length = 0;
     serverRuns.forEach(function (sr) {
@@ -670,7 +691,7 @@ function renderRunList() {
                     기록시각: withUpdatedDate(record.기록시각, newDate)
                 };
 
-                const response = await fetch(`${API_BASE}/runs/${updated.id}`, {
+                const response = await apiFetch(`${API_BASE}/runs/${updated.id}`, {
                     method: "PUT",
                     credentials: "include",
                     headers: { "Content-Type": "application/json" },
@@ -722,7 +743,7 @@ function renderRunList() {
                 });
 
                 deleteBtn.addEventListener("click", async function () {
-                    await fetch(`${API_BASE}/runs/${runRecords[index].id}`, { method: "DELETE", credentials: "include" });
+                    await apiFetch(`${API_BASE}/runs/${runRecords[index].id}`, { method: "DELETE", credentials: "include" });
                     runRecords.splice(index, 1);
                     openRunIndex = null;
                     renderRunList();
@@ -835,7 +856,7 @@ function renderInfo() {
 
 // 서버에서 컨디션 메모 목록 통째로 가져오기
 async function loadMemoRecords() {
-    const response = await fetch(`${API_BASE}/memos`, { credentials: "include" });
+    const response = await apiFetch(`${API_BASE}/memos`, { credentials: "include" });
     const serverMemos = await response.json();
     memoRecords.length = 0;
     serverMemos.forEach(function (sm) {
@@ -967,7 +988,7 @@ function renderMemoList() {
                     증상점수: Number(card.querySelector(".edit-memo-score-input").value)
                 };
 
-                const response = await fetch(`${API_BASE}/memos/${updated.id}`, {
+                const response = await apiFetch(`${API_BASE}/memos/${updated.id}`, {
                     method: "PUT",
                     credentials: "include",
                     headers: { "Content-Type": "application/json" },
@@ -1005,7 +1026,7 @@ function renderMemoList() {
             });
 
             deleteBtn.addEventListener("click", async function () {
-                await fetch(`${API_BASE}/memos/${memoRecords[index].id}`, { method: "DELETE", credentials: "include" });
+                await apiFetch(`${API_BASE}/memos/${memoRecords[index].id}`, { method: "DELETE", credentials: "include" });
                 memoRecords.splice(index, 1);
                 openMemoIndex = null;
                 renderMemoList();
@@ -1197,7 +1218,7 @@ runSaveBtn.addEventListener("click", async function () {
         기록시각: pendingCalendarDate ? dateWithCurrentTime(pendingCalendarDate) : null
     };
 
-    const response = await fetch(`${API_BASE}/runs`, {
+    const response = await apiFetch(`${API_BASE}/runs`, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
@@ -1351,7 +1372,7 @@ memoSaveBtn.addEventListener("click", async function () {
         증상점수: symptomScore
     };
 
-    const response = await fetch(`${API_BASE}/memos`, {
+    const response = await apiFetch(`${API_BASE}/memos`, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
@@ -1377,6 +1398,8 @@ memoSaveBtn.addEventListener("click", async function () {
 
 // --- 로그인 관련 이벤트 ---
 // 로그아웃 후 새로고침 — 새로고침해야 login-gate가 기본 표시 상태로 다시 시작함
+// (이미 만료된 세션에서 로그아웃을 눌러도 새로고침으로 어차피 로그인 게이트로 가므로 apiFetch의
+// 만료 alert는 필요 없음 — 그래서 여기만 apiFetch가 아닌 일반 fetch를 그대로 씀)
 logoutBtn.addEventListener("click", async function () {
     await fetch(`${API_BASE}/auth/logout`, { method: "POST", credentials: "include" });
     window.location.reload();
