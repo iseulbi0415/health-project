@@ -24,7 +24,10 @@ public class MemoController {
     }
 
     @GetMapping(produces = "application/json;charset=UTF-8")
-    public List<Memo> getAllMemos(@AuthenticationPrincipal KakaoOAuth2User principal) {
+    public List<Memo> getAllMemos(@RequestParam(required = false) String date, @AuthenticationPrincipal KakaoOAuth2User principal) {
+        if (date != null) {
+            return memoRepository.findByUserIdAndDate(principal.getInternalUserId(), date);
+        }
         return memoRepository.findByUserId(principal.getInternalUserId());
     }
 

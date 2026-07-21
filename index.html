@@ -78,8 +78,33 @@
 
         <div class="screen-body">
 
+          <button type="button" id="diet-calendar-toggle-btn" class="btn-calendar-toggle">📅 달력 보기</button>
+
+          <div id="diet-calendar-box" class="hcard" style="display:none;">
+            <div class="calendar-header">
+              <button type="button" id="calendar-prev-btn" class="calendar-nav-btn">‹</button>
+              <div id="calendar-month-label" class="calendar-month-label"></div>
+              <button type="button" id="calendar-next-btn" class="calendar-nav-btn">›</button>
+            </div>
+            <div class="calendar-weekdays">
+              <span>일</span><span>월</span><span>화</span><span>수</span><span>목</span><span>금</span><span>토</span>
+            </div>
+            <div id="calendar-grid" class="calendar-grid"></div>
+          </div>
+
+          <div id="calendar-detail-box" class="hcard" style="display:none;">
+            <div id="calendar-detail-date" class="sec-lbl"></div>
+            <div id="calendar-detail-content"></div>
+            <div class="calendar-detail-actions">
+              <button type="button" id="calendar-add-food-btn" class="btn-cal-add">+ 이 날짜로 음식 추가</button>
+              <button type="button" id="calendar-add-run-btn" class="btn-cal-add">+ 이 날짜로 러닝 추가</button>
+              <button type="button" id="calendar-add-memo-btn" class="btn-cal-add">+ 이 날짜로 메모 추가</button>
+            </div>
+          </div>
+
           <div class="hcard">
             <div class="sec-lbl">빠른 추가 — 자주 먹는 음식</div>
+            <div id="food-date-target-banner" class="date-target-banner" style="display:none;"></div>
             <div id="quick-add-list" class="quick-row"></div>
           </div>
 
@@ -141,6 +166,7 @@
 
           <div class="hcard">
             <div class="sec-lbl">새 기록 추가</div>
+            <div id="run-date-target-banner" class="date-target-banner" style="display:none;"></div>
             <div id="run-input-form">
               <input type="number" id="run-distance-input" class="inp" placeholder="거리(km)" step="0.01">
               <input type="text" id="run-time-input" class="inp" placeholder="시간(예: 30:15)">
@@ -193,6 +219,7 @@
 
           <div id="condition-memo-section" class="hcard">
             <div class="sec-lbl">오늘의 컨디션 메모</div>
+            <div id="memo-date-target-banner" class="date-target-banner" style="display:none;"></div>
             <textarea id="condition-memo-input" class="inp" placeholder="오늘의 컨디션을 자유롭게 기록하세요."></textarea>
 
             <div class="sec-lbl">오늘 증상 점수</div>

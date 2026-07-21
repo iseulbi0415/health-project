@@ -6,6 +6,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -20,13 +21,22 @@ public class FoodController {
 
     @PostMapping(produces = "application/json;charset=UTF-8")
     public Food createFood(@RequestBody Food food, @AuthenticationPrincipal KakaoOAuth2User principal) {
-        food.setRecordedAt(LocalDateTime.now());
+        // 요청에 recordedAt이 이미 있으면(달력에서 과거 날짜 지정) 그 값을 존중하고,
+        // 없으면(평소처럼 즐겨찾기 pill로 "지금 먹었어요") 서버 현재 시각을 기본값으로 채움
+        if (food.getRecordedAt() == null) {
+            food.setRecordedAt(LocalDateTime.now());
+        }
         food.setUser(userRepository.findById(principal.getInternalUserId()).orElseThrow());
         return foodRepository.save(food);
     }
 
     @GetMapping(produces = "application/json;charset=UTF-8")
-    public List<Food> getAllFoods(@AuthenticationPrincipal KakaoOAuth2User principal) {
+    public List<Food> getAllFoods(@RequestParam(required = false) String date, @AuthenticationPrincipal KakaoOAuth2User principal) {
+        if (date != null) {
+            LocalDate day = LocalDate.parse(date);
+            return foodRepository.findByUserIdAndRecordedAtGreaterThanEqualAndRecordedAtLessThan(
+                    principal.getInternalUserId(), day.atStartOfDay(), day.plusDays(1).atStartOfDay());
+        }
         return foodRepository.findByUserId(principal.getInternalUserId());
     }
 

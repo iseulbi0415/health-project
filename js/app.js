@@ -48,9 +48,20 @@ let symptomScore = 5;
 // 롱프레스 직후 발생하는 click을 "추가"로 오인하지 않도록 구분하는 용도)
 let quickAddLongPressFired = false;
 
+// --- 식단: 달력 뷰 관련 ---
+const calendarInitDate = new Date();
+let calendarYear = calendarInitDate.getFullYear();
+let calendarMonth = calendarInitDate.getMonth() + 1; // getMonth()는 0부터 시작해서 +1
+let calendarMarkedDates = new Set(); // 이번 화면에 떠 있는 달의 "기록 있는 날짜" 집합 (yyyy-MM-dd)
+let selectedCalendarDate = null; // 달력에서 클릭해서 상세보기 중인 날짜
+let calendarLoaded = false; // 달력을 한 번이라도 연 적 있는지(첫 오픈 때만 요약을 새로 불러옴)
+// "이 날짜로 추가" 버튼을 눌렀을 때만 세팅됨 — 즐겨찾기 pill/러닝 저장이 이 값을 한 번 소비하고 다시 null로 되돌림
+let pendingCalendarDate = null;
+
 // --- 서버 데이터 <-> 한글 변수 이름 번역기 (fetch로 주고받을 때만 사용) ---
-// 기록시각(recordedAt)은 화면에 표시/입력하는 곳은 아직 없지만, PUT으로 되돌려 보낼 때
-// 값이 없으면 서버가 null로 덮어쓰지 않고 기존 값을 유지하므로 왕복 전달만 해둠(향후 날짜별 기록 관리 기능 대비)
+// 기록시각(recordedAt): 평소엔 화면에 안 보이고 서버가 현재 시각으로 채우지만, PUT으로 되돌려 보낼 때
+// 값이 없으면 서버가 null로 덮어쓰지 않고 기존 값을 유지하므로 왕복 전달만 해둠. 달력의 "이 날짜로 추가"
+// 흐름에서만 dateWithCurrentTime()으로 값을 채워 보내 과거 날짜로 저장함
 function toServerFood(f) { return { name: f.이름, calorie: f.칼로리, digestTime: f.소화시간, isTrigger: f.트리거 || false, recordedAt: f.기록시각 || null }; }
 function fromServerFood(sf) { return { id: sf.id, 이름: sf.name, 칼로리: sf.calorie, 소화시간: sf.digestTime, 트리거: sf.isTrigger, 기록시각: sf.recordedAt }; }
 
@@ -76,9 +87,24 @@ const mealCompleteBtn = document.getElementById("meal-complete-btn");
 const addFoodBtn = document.getElementById("add-food-btn");
 const digestButtons = document.querySelectorAll(".digest-btn");
 const digestCancelBtn = document.getElementById("digest-cancel-btn");
+const foodDateTargetBanner = document.getElementById("food-date-target-banner");
+
+const dietCalendarToggleBtn = document.getElementById("diet-calendar-toggle-btn");
+const dietCalendarBox = document.getElementById("diet-calendar-box");
+const calendarPrevBtn = document.getElementById("calendar-prev-btn");
+const calendarNextBtn = document.getElementById("calendar-next-btn");
+const calendarMonthLabel = document.getElementById("calendar-month-label");
+const calendarGrid = document.getElementById("calendar-grid");
+const calendarDetailBox = document.getElementById("calendar-detail-box");
+const calendarDetailDate = document.getElementById("calendar-detail-date");
+const calendarDetailContent = document.getElementById("calendar-detail-content");
+const calendarAddFoodBtn = document.getElementById("calendar-add-food-btn");
+const calendarAddRunBtn = document.getElementById("calendar-add-run-btn");
+const calendarAddMemoBtn = document.getElementById("calendar-add-memo-btn");
 
 const runList = document.getElementById("run-list");
 const runSaveBtn = document.getElementById("run-save-btn");
+const runDateTargetBanner = document.getElementById("run-date-target-banner");
 
 const genderButtons = document.querySelectorAll(".gender-btn");
 const infoSaveBtn = document.getElementById("info-save-btn");
@@ -86,6 +112,7 @@ const activityButtons = document.querySelectorAll(".activity-btn");
 
 const memoInput = document.getElementById("condition-memo-input");
 const memoSaveBtn = document.getElementById("memo-save-btn");
+const memoDateTargetBanner = document.getElementById("memo-date-target-banner");
 const memoList = document.getElementById("memo-list");
 const symptomScoreSlider = document.getElementById("symptom-score-slider");
 const symptomScoreDisplay = document.getElementById("symptom-score-display");
@@ -247,15 +274,28 @@ function renderQuickAddList() {
                     return;
                 }
 
+                // 달력에서 "이 날짜로 음식 추가"를 눌러둔 상태면 그 날짜로, 아니면 평소처럼 서버가 현재 시각으로 저장
+                const foodToSave = { ...food };
+                if (pendingCalendarDate) {
+                    foodToSave.기록시각 = dateWithCurrentTime(pendingCalendarDate);
+                }
+
                 const response = await fetch(`${API_BASE}/foods`, {
                     method: "POST",
                     credentials: "include",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(toServerFood({ ...food }))
+                    body: JSON.stringify(toServerFood(foodToSave))
                 });
                 const saved = await response.json();
                 todayFoods.push(fromServerFood(saved));
                 renderFoodList();
+
+                if (pendingCalendarDate) {
+                    const savedDate = pendingCalendarDate;
+                    clearPendingCalendarDate();
+                    loadCalendarSummary(calendarYear, calendarMonth);
+                    if (selectedCalendarDate === savedDate) loadCalendarDetail(savedDate);
+                }
             });
         }
     });
@@ -426,6 +466,125 @@ function startDigestTimer(startSeconds, endTime, totalSeconds) {
             document.getElementById("home-digest-warning").textContent = "🙅‍♀️ 아직 눕지 마세요!";
         }
     }, 1000);
+}
+
+// --- 식단: 달력 뷰 관련 함수 ---
+
+// "YYYY-MM-DD" 날짜만 있는 값에 지금 시:분:초를 붙여 LocalDateTime과 호환되는 문자열로 만듦
+// (withUpdatedDate()는 기존 recordedAt의 시간을 유지하며 날짜만 바꾸는 용도였다면,
+// 이건 아예 새로 기록을 남길 때 recordedAt 전체를 만드는 용도의 자매 함수)
+function dateWithCurrentTime(dateStr) {
+    const now = new Date();
+    const hh = String(now.getHours()).padStart(2, "0");
+    const mm = String(now.getMinutes()).padStart(2, "0");
+    const ss = String(now.getSeconds()).padStart(2, "0");
+    return `${dateStr}T${hh}:${mm}:${ss}`;
+}
+
+// "이 날짜로 추가" 버튼을 누른 순간의 상태 — 즐겨찾기 pill 클릭이나 러닝 저장이
+// 이 값을 한 번 읽어서 recordedAt으로 쓰고, 저장 성공 후 clearPendingCalendarDate()로 되돌림
+function setPendingCalendarDate(dateStr, bannerEl) {
+    pendingCalendarDate = dateStr;
+    foodDateTargetBanner.style.display = "none";
+    runDateTargetBanner.style.display = "none";
+    memoDateTargetBanner.style.display = "none";
+    bannerEl.textContent = `📅 ${dateStr}로 저장됩니다`;
+    bannerEl.style.display = "block";
+}
+
+function clearPendingCalendarDate() {
+    pendingCalendarDate = null;
+    foodDateTargetBanner.style.display = "none";
+    runDateTargetBanner.style.display = "none";
+    memoDateTargetBanner.style.display = "none";
+}
+
+// 서버에서 해당 월의 "기록 있는 날짜" 목록을 받아와 달력을 다시 그림
+async function loadCalendarSummary(year, month) {
+    const response = await fetch(`${API_BASE}/records/summary?year=${year}&month=${month}`, { credentials: "include" });
+    const dates = await response.json();
+    calendarMarkedDates = new Set(dates);
+    renderCalendar();
+}
+
+// 달력 그리드 그리기 — 1일의 요일만큼 빈 칸을 먼저 채우고, 그 뒤로 날짜 칸을 이어서 그림
+function renderCalendar() {
+    calendarMonthLabel.textContent = `${calendarYear}년 ${calendarMonth}월`;
+    calendarGrid.innerHTML = "";
+
+    const firstWeekday = new Date(calendarYear, calendarMonth - 1, 1).getDay();
+    const daysInMonth = new Date(calendarYear, calendarMonth, 0).getDate();
+    const todayStr = todayDateString();
+
+    for (let i = 0; i < firstWeekday; i++) {
+        const empty = document.createElement("div");
+        empty.className = "calendar-cell empty";
+        calendarGrid.appendChild(empty);
+    }
+
+    for (let day = 1; day <= daysInMonth; day++) {
+        const dateStr = `${calendarYear}-${String(calendarMonth).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+        const cell = document.createElement("div");
+        cell.className = "calendar-cell";
+        if (dateStr === todayStr) cell.classList.add("today");
+        if (dateStr === selectedCalendarDate) cell.classList.add("selected");
+
+        const dot = calendarMarkedDates.has(dateStr) ? `<span class="cal-dot"></span>` : "";
+        cell.innerHTML = `<span>${day}</span>${dot}`;
+
+        cell.addEventListener("click", function () {
+            clearPendingCalendarDate(); // 다른 날짜를 고르면 이전에 눌러둔 "이 날짜로 추가" 상태는 무효화
+            selectedCalendarDate = dateStr;
+            renderCalendar();
+            loadCalendarDetail(dateStr);
+        });
+
+        calendarGrid.appendChild(cell);
+    }
+}
+
+// 선택한 날짜의 음식/러닝/메모를 병렬로 불러와 상세 카드에 요약해서 보여줌
+async function loadCalendarDetail(dateStr) {
+    calendarDetailBox.style.display = "block";
+    calendarDetailDate.textContent = `${dateStr} 기록`;
+    calendarDetailContent.innerHTML = "불러오는 중...";
+
+    const [foodRes, runRes, memoRes] = await Promise.all([
+        fetch(`${API_BASE}/foods?date=${dateStr}`, { credentials: "include" }),
+        fetch(`${API_BASE}/runs?date=${dateStr}`, { credentials: "include" }),
+        fetch(`${API_BASE}/memos?date=${dateStr}`, { credentials: "include" })
+    ]);
+    const dayFoods = (await foodRes.json()).map(fromServerFood);
+    const dayRuns = (await runRes.json()).map(fromServerRun);
+    const dayMemos = (await memoRes.json()).map(fromServerMemo);
+
+    if (dayFoods.length === 0 && dayRuns.length === 0 && dayMemos.length === 0) {
+        calendarDetailContent.innerHTML = `<div class="insight-sub">이 날짜엔 기록이 없어요.</div>`;
+        return;
+    }
+
+    let html = "";
+    if (dayFoods.length > 0) {
+        const totalCal = dayFoods.reduce(function (sum, f) { return sum + f.칼로리; }, 0);
+        html += `<div class="insight-sub">🍽 식단 (총 ${totalCal}kcal)</div>`;
+        html += dayFoods.map(function (f) {
+            const tag = f.트리거 ? ` <span class="trigger-tag">⚠️ 트리거</span>` : "";
+            return `<div class="insight-food-row"><span>${f.이름}</span><span>${f.칼로리}kcal${tag}</span></div>`;
+        }).join("");
+    }
+    if (dayRuns.length > 0) {
+        html += `<div class="insight-sub">🏃 러닝</div>`;
+        html += dayRuns.map(function (r) {
+            return `<div class="insight-food-row"><span>${r.거리}km</span><span>${r.칼로리.toFixed(0)}kcal</span></div>`;
+        }).join("");
+    }
+    if (dayMemos.length > 0) {
+        html += `<div class="insight-sub">📝 컨디션 메모</div>`;
+        html += dayMemos.map(function (m) {
+            return `<div class="insight-food-row"><span>증상 ${m.증상점수}/10</span><span>${m.내용}</span></div>`;
+        }).join("");
+    }
+    calendarDetailContent.innerHTML = html;
 }
 
 // --- 러닝 관련 함수 ---
@@ -870,6 +1029,56 @@ function renderMemoList() {
 // ===== ④ 이벤트 리스너 연결 =====
 
 // --- 식단 관련 이벤트 ---
+
+// 📅 버튼 클릭 시: 달력 열고/닫기. 처음 열 때만 그 달 요약을 서버에서 불러옴(이후엔 prev/next에서만 재조회)
+dietCalendarToggleBtn.addEventListener("click", function () {
+    const isHidden = dietCalendarBox.style.display === "none";
+    dietCalendarBox.style.display = isHidden ? "block" : "none";
+
+    if (isHidden && !calendarLoaded) {
+        calendarLoaded = true;
+        loadCalendarSummary(calendarYear, calendarMonth);
+    }
+    if (!isHidden) {
+        // 달력을 닫으면 상세보기/펜딩 상태도 같이 정리 (다음에 열었을 때 묵은 상태가 남지 않도록)
+        calendarDetailBox.style.display = "none";
+        selectedCalendarDate = null;
+        clearPendingCalendarDate();
+    }
+});
+
+calendarPrevBtn.addEventListener("click", function () {
+    calendarMonth -= 1;
+    if (calendarMonth < 1) { calendarMonth = 12; calendarYear -= 1; }
+    loadCalendarSummary(calendarYear, calendarMonth);
+});
+
+calendarNextBtn.addEventListener("click", function () {
+    calendarMonth += 1;
+    if (calendarMonth > 12) { calendarMonth = 1; calendarYear += 1; }
+    loadCalendarSummary(calendarYear, calendarMonth);
+});
+
+// "이 날짜로 음식 추가": 즐겨찾기 pill을 그대로 재사용 — 그 카드로 스크롤하고 배너로 안내
+calendarAddFoodBtn.addEventListener("click", function () {
+    setPendingCalendarDate(selectedCalendarDate, foodDateTargetBanner);
+    quickAddList.closest(".hcard").scrollIntoView({ behavior: "smooth" });
+});
+
+// "이 날짜로 러닝 추가": 러닝 탭의 기존 입력 폼을 그대로 재사용 — 탭 자동 전환 후 배너로 안내
+calendarAddRunBtn.addEventListener("click", function () {
+    setPendingCalendarDate(selectedCalendarDate, runDateTargetBanner);
+    document.querySelector('.tab-btn[data-index="2"]').click();
+});
+
+// "이 날짜로 메모 추가": 내 정보 탭의 기존 컨디션 메모 폼을 그대로 재사용 —
+// 탭 자동 전환 후 메모 작성 영역까지 스크롤(내 정보 탭엔 체중/BMR 폼도 같이 있어서 메모 카드가 화면 아래쪽에 있음)
+calendarAddMemoBtn.addEventListener("click", function () {
+    setPendingCalendarDate(selectedCalendarDate, memoDateTargetBanner);
+    document.querySelector('.tab-btn[data-index="3"]').click();
+    document.getElementById("condition-memo-section").scrollIntoView({ behavior: "smooth" });
+});
+
 // "식사 완료" 버튼 클릭 시: 가장 오래 걸리는 소화시간을 찾아서 끝나는 시각을 저장하고 타이머 시작
 mealCompleteBtn.addEventListener("click", function () {
 
@@ -969,12 +1178,14 @@ runSaveBtn.addEventListener("click", async function () {
 
     const stats = calculateRunStats(distance, totalMinutes);
 
+    // 달력에서 "이 날짜로 러닝 추가"를 눌러둔 상태면 그 날짜로, 아니면 평소처럼 서버가 현재 시각으로 저장
     const newRecord = {
         거리: distance,
         시간: totalMinutes,
         심박수: heartrate,
         시속: stats.speedKmh,
-        칼로리: stats.caloriesBurned
+        칼로리: stats.caloriesBurned,
+        기록시각: pendingCalendarDate ? dateWithCurrentTime(pendingCalendarDate) : null
     };
 
     const response = await fetch(`${API_BASE}/runs`, {
@@ -991,6 +1202,14 @@ runSaveBtn.addEventListener("click", async function () {
     document.getElementById("run-heartrate-input").value = "";
 
     renderRunList();
+
+    if (pendingCalendarDate) {
+        const savedDate = pendingCalendarDate;
+        clearPendingCalendarDate();
+        loadCalendarSummary(calendarYear, calendarMonth);
+        if (selectedCalendarDate === savedDate) loadCalendarDetail(savedDate);
+        document.querySelector('.tab-btn[data-index="1"]').click(); // 식단 탭(달력)으로 복귀
+    }
 });
 
 // --- 내 정보 관련 이벤트 ---
@@ -1116,8 +1335,9 @@ memoSaveBtn.addEventListener("click", async function () {
         return;
     }
 
+    // 달력에서 "이 날짜로 메모 추가"를 눌러둔 상태면 그 날짜로, 아니면 평소처럼 오늘 날짜로 저장
     const newMemo = {
-        날짜: todayDateString(),
+        날짜: pendingCalendarDate || todayDateString(),
         내용: memoInput.value,
         증상점수: symptomScore
     };
@@ -1136,6 +1356,14 @@ memoSaveBtn.addEventListener("click", async function () {
     symptomScoreSlider.value = 5;
     symptomScoreDisplay.textContent = 5;
     renderMemoList();
+
+    if (pendingCalendarDate) {
+        const savedDate = pendingCalendarDate;
+        clearPendingCalendarDate();
+        loadCalendarSummary(calendarYear, calendarMonth);
+        if (selectedCalendarDate === savedDate) loadCalendarDetail(savedDate);
+        document.querySelector('.tab-btn[data-index="1"]').click(); // 식단 탭(달력)으로 복귀
+    }
 });
 
 // --- 로그인 관련 이벤트 ---
@@ -1160,6 +1388,15 @@ document.addEventListener('DOMContentLoaded', function () {
         btn.addEventListener("click", function () {
             const index = Number(btn.dataset.index);
             const screens = document.getElementById("screens");
+
+            // 이동 칸 수만큼 이동 거리도 늘어나는데 애니메이션 시간은 고정이면, 여러 칸을 건너뛰는
+            // 전환(예: 달력에서 "이 날짜로 메모 추가" 클릭 시 식단→내정보처럼 2칸)이 유난히 빨라 보임 —
+            // 칸당 이동 거리는 일정하니, 칸 수에 비례해서 애니메이션 시간도 늘려 체감 속도를 맞춤
+            const currentBtn = document.querySelector(".tab-btn.active");
+            const currentIndex = currentBtn ? Number(currentBtn.dataset.index) : 0;
+            const distance = Math.max(1, Math.abs(index - currentIndex));
+            screens.style.transitionDuration = `${0.45 + (distance - 1) * 0.15}s`;
+
             screens.style.transform = `translateX(-${index * 100}vw)`;
 
             document.querySelectorAll(".tab-btn").forEach(function (b) {

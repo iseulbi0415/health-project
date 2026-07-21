@@ -6,6 +6,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -20,14 +21,22 @@ public class RunController {
 
     @PostMapping(produces = "application/json;charset=UTF-8")
     public Run createRun(@RequestBody Run run, @AuthenticationPrincipal KakaoOAuth2User principal) {
-        // 저장 시각은 클라이언트가 보내도 무시하고 서버 기준 현재 시각으로 고정
-        run.setRecordedAt(LocalDateTime.now());
+        // 요청에 recordedAt이 이미 있으면(달력에서 과거 날짜 지정) 그 값을 존중하고,
+        // 없으면(평소처럼 러닝 탭에서 "방금 뛰었어요") 서버 현재 시각을 기본값으로 채움
+        if (run.getRecordedAt() == null) {
+            run.setRecordedAt(LocalDateTime.now());
+        }
         run.setUser(userRepository.findById(principal.getInternalUserId()).orElseThrow());
         return runRepository.save(run);
     }
 
     @GetMapping(produces = "application/json;charset=UTF-8")
-    public List<Run> getAllRuns(@AuthenticationPrincipal KakaoOAuth2User principal) {
+    public List<Run> getAllRuns(@RequestParam(required = false) String date, @AuthenticationPrincipal KakaoOAuth2User principal) {
+        if (date != null) {
+            LocalDate day = LocalDate.parse(date);
+            return runRepository.findByUserIdAndRecordedAtGreaterThanEqualAndRecordedAtLessThan(
+                    principal.getInternalUserId(), day.atStartOfDay(), day.plusDays(1).atStartOfDay());
+        }
         return runRepository.findByUserId(principal.getInternalUserId());
     }
 
