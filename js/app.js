@@ -63,6 +63,7 @@ function fromServerMemo(sm) { return { id: sm.id, 날짜: sm.date, 내용: sm.co
 
 // ===== ② HTML 요소 찾아오기 =====
 
+const loadingScreen = document.getElementById("loading-screen");
 const loginGate = document.getElementById("login-gate");
 const appShell = document.getElementById("app-shell");
 const loginNickname = document.getElementById("login-nickname");
@@ -96,15 +97,19 @@ const homeCalorieGuide = document.getElementById("home-calorie-guide");
 
 // --- 로그인 관련 함수 ---
 
-// 로그인 상태 확인 — 로그인 됐으면 게이트를 치우고 앱을 보여주고, 아니면 게이트가 기본 상태(보임) 그대로 유지
+// 로그인 상태 확인 — 응답 오기 전까진 loading-screen만 보이는 상태(기본값)라 login-gate가
+// "잠깐 보였다 사라지는" 깜빡임이 없음. 응답이 오면 결과에 맞는 화면만 보여줌
 async function checkLoginState() {
     const response = await fetch(`${API_BASE}/auth/me`, { credentials: "include" });
     const data = await response.json();
 
+    loadingScreen.style.display = "none";
+
     if (data.loggedIn) {
         loginNickname.textContent = `${data.nickname}님`;
-        loginGate.style.display = "none";
         appShell.style.display = "block";
+    } else {
+        loginGate.style.display = "flex";
     }
 
     return data.loggedIn;

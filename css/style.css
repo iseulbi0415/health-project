@@ -48,6 +48,29 @@ body {
   background: linear-gradient(160deg, #1c2b4a 0%, #2c5fb3 45%, #4c2a8a 100%);
   padding: 24px;
 }
+
+/* loading-screen은 login-gate보다 위(z-index)에 떠서, 로그인 확인 응답이 늦게 와도
+   login-gate 카드가 먼저 그려졌다가 가려지는 이중 렌더링 없이 스피너만 보이게 함 */
+#loading-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(160deg, #1c2b4a 0%, #2c5fb3 45%, #4c2a8a 100%);
+}
+.loading-spinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid rgba(255,255,255,0.25);
+  border-top-color: #ffffff;
+  border-radius: 50%;
+  animation: loading-spin 0.8s linear infinite;
+}
+@keyframes loading-spin {
+  to { transform: rotate(360deg); }
+}
 .login-gate-card {
   width: 100%;
   max-width: 340px;

@@ -10,7 +10,13 @@
 
 <body>
 
-  <div id="login-gate">
+  <!-- 로그인 여부 확인 응답이 오기 전까지 보여주는 화면. login-gate와 같은 배경을 써서
+       "로그인 안 됨"으로 판명 나 login-gate로 바뀌어도 배경이 안 바뀌어 깜빡임이 없음 -->
+  <div id="loading-screen">
+    <div class="loading-spinner"></div>
+  </div>
+
+  <div id="login-gate" style="display:none;">
     <div class="login-gate-card">
       <div class="login-gate-emoji">🩺</div>
       <div class="login-gate-title">건강 케어 & 러닝 트래커</div>
