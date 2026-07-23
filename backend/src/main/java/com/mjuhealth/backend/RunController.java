@@ -19,8 +19,26 @@ public class RunController {
     @Autowired
     private UserRepository userRepository;
 
+    private static final int MIN_HEART_RATE = 30;
+    private static final int MAX_HEART_RATE = 250;
+
+    // 프론트에서도 동일 기준으로 막지만, 프론트를 우회한 요청(직접 API 호출 등)에 대비해
+    // 서버에서도 같은 검증을 한 번 더 함
+    private void validateRun(Run run) {
+        if (run.getDistance() <= 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "거리는 0보다 커야 합니다.");
+        }
+        if (run.getTime() <= 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "시간은 0보다 커야 합니다.");
+        }
+        if (run.getHeartRate() < MIN_HEART_RATE || run.getHeartRate() > MAX_HEART_RATE) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "심박수가 올바르지 않습니다.");
+        }
+    }
+
     @PostMapping(produces = "application/json;charset=UTF-8")
     public Run createRun(@RequestBody Run run, @AuthenticationPrincipal KakaoOAuth2User principal) {
+        validateRun(run);
         // 요청에 recordedAt이 이미 있으면(달력에서 과거 날짜 지정) 그 값을 존중하고,
         // 없으면(평소처럼 러닝 탭에서 "방금 뛰었어요") 서버 현재 시각을 기본값으로 채움
         if (run.getRecordedAt() == null) {
@@ -42,6 +60,7 @@ public class RunController {
 
     @PutMapping(value = "/{id}", produces = "application/json;charset=UTF-8")
     public Run updateRun(@PathVariable Long id, @RequestBody Run run, @AuthenticationPrincipal KakaoOAuth2User principal) {
+        validateRun(run);
         Run existing = runRepository.findById(id).orElseThrow();
         if (!existing.getUser().getId().equals(principal.getInternalUserId())) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN);

@@ -679,6 +679,12 @@ function renderRunList() {
                 const newHeartrate = Number(card.querySelector(".edit-heartrate-input").value);
                 const newDate = card.querySelector(".edit-run-date-input").value;
 
+                const editError = validateRunInput(newDistance, newTotalMinutes, newHeartrate);
+                if (editError) {
+                    alert(editError);
+                    return;
+                }
+
                 const newStats = calculateRunStats(newDistance, newTotalMinutes);
 
                 const updated = {
@@ -780,6 +786,15 @@ function renderRunList() {
     else {
         document.getElementById("home-run-value").textContent = "아직 기록 없음";
     }
+}
+
+// 러닝 기록 저장 전 값 검증 — 프론트에서 1차로 막아서 이상한 값이 서버까지 안 가도록 함
+// (서버 쪽 RunController에도 같은 기준으로 2차 검증이 있음: 프론트 우회 요청 대비)
+function validateRunInput(distance, totalMinutes, heartRate) {
+    if (distance <= 0) return "거리는 0보다 커야 합니다.";
+    if (totalMinutes <= 0) return "시간은 0보다 커야 합니다.";
+    if (heartRate < 30 || heartRate > 250) return "심박수가 올바르지 않습니다 (30~250 사이로 입력해주세요).";
+    return null;
 }
 
 // 시속에 따라 MET(운동 강도) 값 결정
@@ -1195,16 +1210,29 @@ runSaveBtn.addEventListener("click", async function () {
         alert("심박수를 입력해주세요!");
         return;
     }
+    // 체중을 한 번도 입력한 적 없으면(내 정보 미작성) 기본값(60kg)으로 조용히 계산하는 대신
+    // 저장을 막고 내 정보 입력을 유도 — 잘못된 칼로리 값이 기록에 남는 것을 방지
+    if (!localStorage.getItem("userWeight")) {
+        alert("정확한 칼로리 계산을 위해 내 정보에서 체중을 먼저 입력해주세요!");
+        document.querySelector('.tab-btn[data-index="3"]').click();
+        return;
+    }
 
     const distance = Number(document.getElementById("run-distance-input").value);
 
     const timeValue = (document.getElementById("run-time-input").value);
     const timeParts = timeValue.split(":");
     const minutes = Number(timeParts[0]);
-    const seconds = Number(timeParts[40]) || 0;
+    const seconds = Number(timeParts[1]) || 0;
     const totalMinutes = minutes + (seconds / 60);
 
     const heartrate = Number(document.getElementById("run-heartrate-input").value);
+
+    const runError = validateRunInput(distance, totalMinutes, heartrate);
+    if (runError) {
+        alert(runError);
+        return;
+    }
 
     const stats = calculateRunStats(distance, totalMinutes);
 
