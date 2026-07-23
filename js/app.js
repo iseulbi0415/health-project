@@ -33,6 +33,10 @@ let runRecords = [];
 let openRunIndex = null;
 let editingRunIndex = null;
 
+// 끼니(아침/점심/저녁/간식) 선택 — 새로고침하면 초기화됨(별도 저장 안 함),
+// 자동 판단 없이 사용자가 매번 직접 고르게 함
+let selectedMeal = null;
+
 // --- 내 정보 관련 ---
 let selectedGender = null;
 let userWeight = Number(localStorage.getItem("userWeight")) || 60;
@@ -62,8 +66,8 @@ let pendingCalendarDate = null;
 // 기록시각(recordedAt): 평소엔 화면에 안 보이고 서버가 현재 시각으로 채우지만, PUT으로 되돌려 보낼 때
 // 값이 없으면 서버가 null로 덮어쓰지 않고 기존 값을 유지하므로 왕복 전달만 해둠. 달력의 "이 날짜로 추가"
 // 흐름에서만 dateWithCurrentTime()으로 값을 채워 보내 과거 날짜로 저장함
-function toServerFood(f) { return { name: f.이름, calorie: f.칼로리, digestTime: f.소화시간, isTrigger: f.트리거 || false, recordedAt: f.기록시각 || null }; }
-function fromServerFood(sf) { return { id: sf.id, 이름: sf.name, 칼로리: sf.calorie, 소화시간: sf.digestTime, 트리거: sf.isTrigger, 기록시각: sf.recordedAt }; }
+function toServerFood(f) { return { name: f.이름, calorie: f.칼로리, digestTime: f.소화시간, isTrigger: f.트리거 || false, meal: f.끼니 || null, quantity: f.수량, recordedAt: f.기록시각 || null }; }
+function fromServerFood(sf) { return { id: sf.id, 이름: sf.name, 칼로리: sf.calorie, 소화시간: sf.digestTime, 트리거: sf.isTrigger, 끼니: sf.meal, 수량: sf.quantity, 기록시각: sf.recordedAt }; }
 
 function toServerRun(r) { return { distance: r.거리, time: r.시간, heartRate: r.심박수, speedKmh: r.시속, calorieBurned: r.칼로리, recordedAt: r.기록시각 || null }; }
 function fromServerRun(sr) { return { id: sr.id, 거리: sr.distance, 시간: sr.time, 심박수: sr.heartRate, 시속: sr.speedKmh, 칼로리: sr.calorieBurned, 기록시각: sr.recordedAt }; }
@@ -88,6 +92,9 @@ const addFoodBtn = document.getElementById("add-food-btn");
 const digestButtons = document.querySelectorAll(".digest-btn");
 const digestCancelBtn = document.getElementById("digest-cancel-btn");
 const foodDateTargetBanner = document.getElementById("food-date-target-banner");
+const foodDateTargetCloseBtn = document.getElementById("food-date-target-close-btn");
+const mealButtons = document.querySelectorAll(".meal-btn");
+const mealButtonsRow = document.getElementById("meal-buttons");
 
 const dietCalendarToggleBtn = document.getElementById("diet-calendar-toggle-btn");
 const dietCalendarBox = document.getElementById("diet-calendar-box");
@@ -195,6 +202,19 @@ function todayDateString() {
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
 }
 
+// 화면을 계속 켜놓은 채 자정을 넘기면 loadTodayFoods()를 다시 부르지 않는 한 어제 기준으로 남아있음 —
+// 1분마다 날짜가 바뀌었는지 확인해서, 바뀌었으면 "오늘 먹은 음식"을 새 날짜 기준으로 다시 불러옴
+let lastKnownDateStr = todayDateString();
+function startMidnightWatcher() {
+    setInterval(function () {
+        const currentDateStr = todayDateString();
+        if (currentDateStr !== lastKnownDateStr) {
+            lastKnownDateStr = currentDateStr;
+            loadTodayFoods();
+        }
+    }, 60000);
+}
+
 // recordedAt(ISO datetime)의 날짜 부분만 새 값으로 바꾸고 기존 시:분:초는 유지
 function withUpdatedDate(recordedAt, newDateStr) {
     const timePart = recordedAt ? recordedAt.slice(10) : "T00:00:00";
@@ -218,6 +238,18 @@ function closeIfOutside(container, openIndex, setOpenIndex, renderFn, e) {
         setOpenIndex(null);
         renderFn();
     }
+}
+
+// 끼니 선택 pill 바깥을 클릭하면 선택 표시 해제 (위 closeIfOutside와 같은 패턴).
+// 단, 즐겨찾기 음식 pill(quickAddList) 클릭은 "바깥"으로 치지 않음 — 그렇게 치면
+// 즐겨찾기로 음식을 추가할 때마다 끼니를 매번 다시 선택해야 해서 연속 추가가 안 됨
+function clearMealIfOutside(e) {
+    if (selectedMeal === null) return;
+    if (mealButtonsRow.contains(e.target) || quickAddList.contains(e.target)) return;
+    selectedMeal = null;
+    mealButtons.forEach(function (b) {
+        b.classList.remove("selected");
+    });
 }
 
 // --- 식단 관련 함수 ---
@@ -295,8 +327,14 @@ function renderQuickAddList() {
                     return;
                 }
 
+                // 낮밤이 바뀌거나 늦게 일어나는 사람 등 변수가 많아 자동 판단 대신 항상 직접 선택하게 함
+                if (selectedMeal === null) {
+                    alert("끼니를 먼저 선택해주세요!");
+                    return;
+                }
+
                 // 달력에서 "이 날짜로 음식 추가"를 눌러둔 상태면 그 날짜로, 아니면 평소처럼 서버가 현재 시각으로 저장
-                const foodToSave = { ...food };
+                const foodToSave = { ...food, 끼니: selectedMeal };
                 if (pendingCalendarDate) {
                     foodToSave.기록시각 = dateWithCurrentTime(pendingCalendarDate);
                 }
@@ -308,14 +346,22 @@ function renderQuickAddList() {
                     body: JSON.stringify(toServerFood(foodToSave))
                 });
                 const saved = await response.json();
-                todayFoods.push(fromServerFood(saved));
+                const savedFood = fromServerFood(saved);
+                // 서버가 같은 날짜·끼니의 기존 항목에 합쳐서 응답한 경우 같은 id가 이미 배열에 있으므로,
+                // 그대로 push하면 화면에 중복으로 보임 — 있으면 교체, 없으면 새로 추가
+                const existingIndex = todayFoods.findIndex(function (f) { return f.id === savedFood.id; });
+                if (existingIndex >= 0) {
+                    todayFoods[existingIndex] = savedFood;
+                } else {
+                    todayFoods.push(savedFood);
+                }
                 renderFoodList();
 
+                // pendingCalendarDate는 배너 닫기 버튼이나 달력을 닫을 때까지 유지 —
+                // 즐겨찾기를 연달아 눌러도 매번 "이 날짜로 추가"를 다시 누를 필요 없게 함
                 if (pendingCalendarDate) {
-                    const savedDate = pendingCalendarDate;
-                    clearPendingCalendarDate();
                     loadCalendarSummary(calendarYear, calendarMonth);
-                    if (selectedCalendarDate === savedDate) loadCalendarDetail(savedDate);
+                    if (selectedCalendarDate === pendingCalendarDate) loadCalendarDetail(pendingCalendarDate);
                 }
             });
         }
@@ -326,9 +372,11 @@ function saveFoods() {
     localStorage.setItem("foods", JSON.stringify(foods));
 }
 
-// 서버에서 오늘 먹은 음식 목록 통째로 가져오기
+// 서버에서 "오늘"에 해당하는 음식 목록만 가져오기
+// (?date= 없이 호출하면 백엔드가 전체 기간을 다 돌려주므로, 반드시 오늘 날짜로 필터링해야 함 —
+// 안 그러면 자정이 지나도 어제 이전 기록까지 계속 "오늘"에 섞여 누적됨)
 async function loadTodayFoods() {
-    const response = await apiFetch(`${API_BASE}/foods`, { credentials: "include" });
+    const response = await apiFetch(`${API_BASE}/foods?date=${todayDateString()}`, { credentials: "include" });
     const serverFoods = await response.json();
     todayFoods.length = 0;
     serverFoods.forEach(function (sf) {
@@ -337,14 +385,10 @@ async function loadTodayFoods() {
     renderFoodList();
 }
 
-// 오늘 먹은 음식 목록 + 총 칼로리를 화면에 그리는 함수
-function renderFoodList() {
-    foodList.innerHTML = "";
-    let total = 0;
-
-    todayFoods.forEach(function (food, index) {
-        total += food.칼로리;
-
+// 음식 카드 한 장을 그리는 함수 — index는 todayFoods 배열의 실제 인덱스여야 함
+// (수정/삭제/롱프레스가 전부 이 인덱스를 기준으로 todayFoods를 직접 참조하기 때문에,
+// 끼니별로 섹션을 나눠 그려도 이 인덱스만큼은 원래 배열 위치 그대로 넘겨야 함)
+function renderFoodCard(food, index) {
         const card = document.createElement("div");
         card.className = "food-card";
 
@@ -384,7 +428,8 @@ function renderFoodList() {
         } else if (openFoodIndex === index) {
             // 롱프레스로 열린 상태: 수정/삭제 버튼 노출
             const triggerTag = food.트리거 ? ` <span class="trigger-tag">⚠️ 트리거</span>` : "";
-            card.innerHTML = `<span class="food-text">${food.이름} - ${food.칼로리} kcal${triggerTag}</span>`;
+            const qtyTag = food.수량 > 1 ? ` x${food.수량}` : "";
+            card.innerHTML = `<span class="food-text">${food.이름}${qtyTag} - ${food.칼로리} kcal${triggerTag}</span>`;
 
             const editBtn = document.createElement("button");
             editBtn.textContent = "수정";
@@ -414,7 +459,8 @@ function renderFoodList() {
         } else {
             // 평소 모드: 500ms 이상 누르면 수정/삭제 버튼 노출
             const triggerTag = food.트리거 ? ` <span class="trigger-tag">⚠️ 트리거</span>` : "";
-            card.innerHTML = `<span class="food-text">${food.이름} - ${food.칼로리} kcal${triggerTag}</span>`;
+            const qtyTag = food.수량 > 1 ? ` x${food.수량}` : "";
+            card.innerHTML = `<span class="food-text">${food.이름}${qtyTag} - ${food.칼로리} kcal${triggerTag}</span>`;
             foodList.appendChild(card);
 
             attachLongPress(card, function () {
@@ -422,6 +468,43 @@ function renderFoodList() {
                 renderFoodList();
             });
         }
+}
+
+// 오늘 먹은 음식 목록 + 총 칼로리를 화면에 그리는 함수 — 아침/점심/저녁/간식 섹션으로 나눠서 표시
+// (자동 판단 없이 사용자가 고른 끼니 기준. 끼니 정보가 없는 과거 기록은 "기타"로 묶어서 안 보이게 두지 않음)
+function renderFoodList() {
+    foodList.innerHTML = "";
+    let total = 0;
+
+    const mealGroups = [
+        { key: "breakfast", label: "🌅 아침" },
+        { key: "lunch", label: "🍚 점심" },
+        { key: "dinner", label: "🌙 저녁" },
+        { key: "snack", label: "🍪 간식" },
+        { key: null, label: "🍽️ 기타" }
+    ];
+
+    mealGroups.forEach(function (group) {
+        // 편집/롱프레스/삭제가 todayFoods의 실제 인덱스를 기준으로 동작하므로,
+        // 그룹으로 나눌 때도 인덱스를 그대로 들고 다님(값만 골라내지 않음)
+        const indexesInGroup = [];
+        todayFoods.forEach(function (food, index) {
+            if ((food.끼니 || null) === group.key) {
+                indexesInGroup.push(index);
+            }
+        });
+        if (indexesInGroup.length === 0) return;
+
+        const sectionLabel = document.createElement("div");
+        sectionLabel.className = "sec-lbl meal-section-label";
+        sectionLabel.textContent = group.label;
+        foodList.appendChild(sectionLabel);
+
+        indexesInGroup.forEach(function (index) {
+            const food = todayFoods[index];
+            total += food.칼로리;
+            renderFoodCard(food, index);
+        });
     });
 
     document.getElementById("total-calorie").textContent = `오늘 총 섭취: ${total} kcal`;
@@ -504,13 +587,18 @@ function dateWithCurrentTime(dateStr) {
 
 // "이 날짜로 추가" 버튼을 누른 순간의 상태 — 즐겨찾기 pill 클릭이나 러닝 저장이
 // 이 값을 한 번 읽어서 recordedAt으로 쓰고, 저장 성공 후 clearPendingCalendarDate()로 되돌림
+// (단, 음식 배너는 닫기 버튼을 누르기 전까지 유지 — renderQuickAddList의 pill 클릭 핸들러 참고)
 function setPendingCalendarDate(dateStr, bannerEl) {
     pendingCalendarDate = dateStr;
     foodDateTargetBanner.style.display = "none";
     runDateTargetBanner.style.display = "none";
     memoDateTargetBanner.style.display = "none";
-    bannerEl.textContent = `📅 ${dateStr}로 저장됩니다`;
-    bannerEl.style.display = "block";
+    // 음식 배너는 텍스트 옆에 닫기 버튼이 같이 있어서, textContent를 통째로 덮어쓰면 버튼이 지워짐 —
+    // .banner-text 자식이 있으면 거기에만 쓰고, 없으면(러닝/메모 배너) 기존처럼 그대로 씀
+    const textTarget = bannerEl.querySelector(".banner-text") || bannerEl;
+    textTarget.textContent = `📅 ${dateStr}로 저장됩니다`;
+    // .date-target-banner는 CSS에서 display:flex(텍스트+닫기 버튼 가로 배치)이므로 "block"이 아니라 "flex"로 보여줘야 함
+    bannerEl.style.display = "flex";
 }
 
 function clearPendingCalendarDate() {
@@ -1161,6 +1249,23 @@ digestCancelBtn.addEventListener("click", function () {
     document.getElementById("home-digest-warning").textContent = "";
 });
 
+// 끼니(아침/점심/저녁/간식) 버튼 클릭 시: 선택 표시 토글 + selectedMeal 값 저장
+// (성별/활동량 버튼과 같은 패턴 — 한 번 선택하면 다른 걸 누르기 전까지 유지)
+mealButtons.forEach(function (btn) {
+    btn.addEventListener("click", function () {
+        mealButtons.forEach(function (b) {
+            b.classList.remove("selected");
+        });
+        btn.classList.add("selected");
+
+        selectedMeal = btn.dataset.meal;
+    });
+});
+
+// 음식 배너의 닫기(✕) 버튼: 사용자가 명시적으로 눌러야 "이 날짜로 추가" 상태가 풀림
+// (즐겨찾기 pill을 여러 번 눌러도 배너를 닫기 전까진 계속 같은 날짜로 저장됨)
+foodDateTargetCloseBtn.addEventListener("click", clearPendingCalendarDate);
+
 // 소화시간 카테고리 버튼 클릭 시: 선택 표시 토글 + selectedDigest 값 저장
 digestButtons.forEach(function (btn) {
     btn.addEventListener("click", function () {
@@ -1439,6 +1544,7 @@ document.addEventListener("click", function (e) {
     closeIfOutside(foodList, openFoodIndex, function (v) { openFoodIndex = v; }, renderFoodList, e);
     closeIfOutside(runList, openRunIndex, function (v) { openRunIndex = v; }, renderRunList, e);
     closeIfOutside(memoList, openMemoIndex, function (v) { openMemoIndex = v; }, renderMemoList, e);
+    clearMealIfOutside(e);
 });
 
 // --- 전역(탭바) ---
@@ -1482,6 +1588,7 @@ checkLoginState().then(function (loggedIn) {
 
     renderQuickAddList();
     loadTodayFoods();   // renderFoodList()는 이 함수 안에서 자동으로 호출됨
+    startMidnightWatcher();   // 화면을 켜놓은 채 자정을 넘기는 경우 대비
     loadRunRecords();   // renderRunList()는 이 함수 안에서 자동으로 호출됨
     renderInfo();
     loadMemoRecords();  // renderMemoList()는 이 함수 안에서 자동으로 호출됨

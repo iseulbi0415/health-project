@@ -433,6 +433,12 @@ body {
   display: flex;
   flex-direction: column;
 }
+.meal-section-label {
+  margin-top: 14px;
+}
+.meal-section-label:first-child {
+  margin-top: 0;
+}
 
 .total-row {
   display: flex;
@@ -663,6 +669,44 @@ textarea.inp {
   font-weight: 600;
   color: #1a7a45;
   margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.banner-close-btn {
+  background: none;
+  border: none;
+  color: #1a7a45;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0 4px;
+}
+
+/* 끼니 선택 pill — 즐겨찾기 음식 pill(.quick-row)과 같은 모양이되, 토글 선택 상태가 필요함 */
+.meal-buttons-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.meal-buttons-row button {
+  background: rgba(46,204,113,0.13);
+  border: 1px solid rgba(46,204,113,0.28);
+  border-radius: 99px;
+  padding: 7px 16px;
+  font-size: 14px;
+  color: #1a7a45;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.meal-buttons-row button:active { transform: scale(0.95); }
+.meal-buttons-row button.selected {
+  background: rgba(46,204,113,0.85);
+  border-color: rgba(46,204,113,0.85);
+  color: white;
 }
 
 /* ===== 러닝 화면 ===== */

@@ -9,6 +9,7 @@ import org.springframework.web.server.ResponseStatusException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/foods")
@@ -26,7 +27,21 @@ public class FoodController {
         if (food.getRecordedAt() == null) {
             food.setRecordedAt(LocalDateTime.now());
         }
-        food.setUser(userRepository.findById(principal.getInternalUserId()).orElseThrow());
+
+        Long userId = principal.getInternalUserId();
+        LocalDate day = food.getRecordedAt().toLocalDate();
+        // 같은 날짜·같은 끼니에 동일한 음식을 또 추가한 경우, 새 행을 쌓는 대신
+        // 기존 행에 수량/칼로리를 합쳐서 "오늘 먹은 음식" 리스트가 중복으로 늘어나지 않게 함
+        Optional<Food> existing = foodRepository.findByUserIdAndNameAndMealAndRecordedAtGreaterThanEqualAndRecordedAtLessThan(
+                userId, food.getName(), food.getMeal(), day.atStartOfDay(), day.plusDays(1).atStartOfDay());
+        if (existing.isPresent()) {
+            Food merged = existing.get();
+            merged.setQuantity(merged.getQuantity() + 1);
+            merged.setCalorie(merged.getCalorie() + food.getCalorie());
+            return foodRepository.save(merged);
+        }
+
+        food.setUser(userRepository.findById(userId).orElseThrow());
         return foodRepository.save(food);
     }
 

@@ -104,7 +104,17 @@
 
           <div class="hcard">
             <div class="sec-lbl">빠른 추가 — 자주 먹는 음식</div>
-            <div id="food-date-target-banner" class="date-target-banner" style="display:none;"></div>
+            <div id="food-date-target-banner" class="date-target-banner" style="display:none;">
+              <span class="banner-text"></span>
+              <button type="button" id="food-date-target-close-btn" class="banner-close-btn">✕</button>
+            </div>
+            <div class="sec-lbl">끼니 선택</div>
+            <div id="meal-buttons" class="meal-buttons-row">
+              <button type="button" class="meal-btn" data-meal="breakfast">아침</button>
+              <button type="button" class="meal-btn" data-meal="lunch">점심</button>
+              <button type="button" class="meal-btn" data-meal="dinner">저녁</button>
+              <button type="button" class="meal-btn" data-meal="snack">간식</button>
+            </div>
             <div id="quick-add-list" class="quick-row"></div>
           </div>
 
