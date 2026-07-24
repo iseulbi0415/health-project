@@ -72,7 +72,7 @@
 | id | Long | `id` bigint PK, auto_increment | `id` | `이름 없음(그대로 id)` |
 | name | String | `name` varchar(255) | `name` | `이름` |
 | calorie | int | `calorie` int | `calorie` | `칼로리` |
-| digestTime | String | `digest_time` varchar(255) | `digestTime` | `소화시간` (실제 값은 "2"/"3"/"4" — 소화 난이도 버튼 🟢🟡🔴에서 온 문자열) |
+| digestTime | String | `digest_time` varchar(255) | `digestTime` | `소화시간` (실제 값은 "2"/"3"/"4". 값의 출처가 두 갈래 — ① 수동 추가: 사용자가 🟢🟡🔴 버튼으로 직접 선택 ② 식약처 검색으로 추가: API가 준 지방(g) 값을 기준(10g/25g)에 자동 대입해 프론트에서 계산, 2-4 참고) |
 | isTrigger | boolean | `is_trigger` bit(1) | `isTrigger` **(+`trigger` 중복 키, 아래 참고)** | `트리거` |
 | recordedAt | LocalDateTime | `recorded_at` datetime | `recordedAt` | `기록시각` (화면 표시 UI는 아직 없음, 아래 참고) |
 | user | User (연관관계) | `user_id` bigint FK, NOT NULL | (요청/응답 바디에 없음) | 로그인 세션에서 서버가 자동으로 채움 |
@@ -139,6 +139,39 @@
 ```json
 { "id": 7, "date": "2026-07-17", "content": "속이 더부룩함", "symptomScore": 6 }
 ```
+
+### 2-4. Food Search (식약처 식품영양성분DB 프록시)
+
+| 엔드포인트 | 메서드 | 설명 |
+|---|---|---|
+| `/api/food-search` | GET (`?keyword=검색어`) | 식약처 오픈API(식품영양성분DB정보, 데이터ID `15127578`)를 검색해 결과를 그대로 전달 |
+
+> ⚠️ **엔드포인트 정정 이력**: 처음엔 `openapi.foodsafetykorea.go.kr` + 서비스ID `I2790`으로 조사해서
+> 구현했는데, 실제로 붙여보니 전부 검색결과 없음으로 나옴. curl로 직접 호출해 확인해보니(식약처 공식
+> 데모용 `sample` 키로도 "서비스를 찾을 수 없습니다" 에러가 남) `I2790`이 폐지된 구버전 API였음. 아래는
+> 정정된 실제 엔드포인트(2026-07-24, 실 서비스키로 curl 호출해 정상 응답 확인 완료).
+
+- 프론트가 식약처 API를 직접 호출하지 않고 이 엔드포인트를 거치는 이유: 인증키(서비스키)를 프론트 코드/네트워크
+  탭에 노출시키지 않기 위함(카카오 REST API 키를 백엔드에만 두는 것과 같은 이유)
+- 인증키는 카카오 키와 동일한 패턴으로 관리: `application.properties`의 `food.api.service-key=${MFDS_SERVICE_KEY:${mfds.service-key}}`
+  — 로컬은 `application-secret.properties`의 `mfds.service-key`, 배포는 Railway Variables의 `MFDS_SERVICE_KEY`
+- 호출 방식: `RestClient`(Spring 6.1+, 별도 의존성 추가 없이 `spring-boot-starter-webmvc`에 포함)로
+  `https://apis.data.go.kr/1471000/FoodNtrCpntDbInfo02/getFoodNtrCpntDbInq02?serviceKey={서비스키}&pageNo=1&numOfRows={건수}&type=json&FOOD_NM_KR={검색어}` 호출
+  (예전 것과 달리 인증키를 경로가 아니라 쿼리파라미터로 넘김)
+- 응답은 `{ "header": {"resultCode","resultMsg"}, "body": {"totalCount","items":[...]} }` 구조 —
+  data.go.kr 문서 템플릿과 달리 `response` 래퍼가 없이 `header`/`body`가 최상위에 바로 옴. 검색결과 0건이면
+  `items` 키 자체가 응답에서 빠짐(null). `resultCode`가 `"00"`이면 정상
+- 이 엔드포인트는 DB에 아무것도 저장하지 않는 순수 프록시 — `Food` 테이블에 새 컬럼을 추가하지 않았음
+  (검색 결과의 지방(g) 값은 프론트가 그때그때 `digestTime` 카테고리로 환산해서 쓰고, 그램 수치 자체는 저장 안 함)
+
+**응답 예시** (프론트로 내려주는 형태, 식약처 원본 필드를 우리 화면에 필요한 값만 추려서 가공)
+```json
+[{ "name": "수박향 아이스크림", "calorie": 143, "fat": 0.87, "servingSize": "100g" }]
+```
+
+- 식약처 응답의 `header.resultCode`가 `"00"`(정상)이 아니거나, `body.items`가 없거나(0건), API 호출 자체가
+  실패하면 에러를 던지지 않고 빈 배열(`[]`)로 응답 — 공공API 장애가 우리 앱 전체를 죽이지 않게 하기 위함
+- 같은 음식명이 지역/연도별로 수십~수백 건씩 중복 샘플링되어 있는 데이터 특성상, 상위 15건만 잘라서 반환
 
 ---
 

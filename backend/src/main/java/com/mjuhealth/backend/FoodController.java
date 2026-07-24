@@ -38,11 +38,20 @@ public class FoodController {
             Food merged = existing.get();
             merged.setQuantity(merged.getQuantity() + 1);
             merged.setCalorie(merged.getCalorie() + food.getCalorie());
+            merged.setFatGrams(sumNullableFat(merged.getFatGrams(), food.getFatGrams()));
             return foodRepository.save(merged);
         }
 
         food.setUser(userRepository.findById(userId).orElseThrow());
         return foodRepository.save(food);
+    }
+
+    // 지방(g)은 검색으로 추가한 음식만 값이 있어서, 병합 시 둘 다 없으면 null 유지하고
+    // 하나라도 있으면 있는 값만 더함 — 지방 미상 즐겨찾기와 정확값 있는 검색 음식이 같은 끼니에
+    // 섞여 병합돼도 끼니 단위 합산(app.js)이 깨지지 않게 함
+    private Double sumNullableFat(Double a, Double b) {
+        if (a == null && b == null) return null;
+        return (a == null ? 0 : a) + (b == null ? 0 : b);
     }
 
     @GetMapping(produces = "application/json;charset=UTF-8")

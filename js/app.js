@@ -9,11 +9,9 @@ const BACKEND_ORIGIN = window.location.hostname === "localhost"
 const API_BASE = `${BACKEND_ORIGIN}/api`;
 
 // --- 식단: 자주 먹는 음식 관련 ---
-const foods = JSON.parse(localStorage.getItem("foods")) || [
-    { 이름: "바나나", 칼로리: 100, 소화시간: 2, 트리거: false },
-    { 이름: "닭가슴살", 칼로리: 165, 소화시간: 3, 트리거: false },
-    { 이름: "삼겹살", 칼로리: 330, 소화시간: 4, 트리거: true }
-];
+// 개발 중 테스트용으로 넣어뒀던 기본 즐겨찾기(바나나/닭가슴살/삼겹살)를 제거함 —
+// 신규 사용자는 즐겨찾기가 빈 배열로 시작해야 함(localStorage에 저장된 값이 없으면 빈 배열)
+const foods = JSON.parse(localStorage.getItem("foods")) || [];
 
 // openQuickAddIndex: 롱프레스로 수정/삭제 버튼이 열려있는 카드 인덱스 (한 번에 하나만 열림)
 let openQuickAddIndex = null;
@@ -66,8 +64,8 @@ let pendingCalendarDate = null;
 // 기록시각(recordedAt): 평소엔 화면에 안 보이고 서버가 현재 시각으로 채우지만, PUT으로 되돌려 보낼 때
 // 값이 없으면 서버가 null로 덮어쓰지 않고 기존 값을 유지하므로 왕복 전달만 해둠. 달력의 "이 날짜로 추가"
 // 흐름에서만 dateWithCurrentTime()으로 값을 채워 보내 과거 날짜로 저장함
-function toServerFood(f) { return { name: f.이름, calorie: f.칼로리, digestTime: f.소화시간, isTrigger: f.트리거 || false, meal: f.끼니 || null, quantity: f.수량, recordedAt: f.기록시각 || null }; }
-function fromServerFood(sf) { return { id: sf.id, 이름: sf.name, 칼로리: sf.calorie, 소화시간: sf.digestTime, 트리거: sf.isTrigger, 끼니: sf.meal, 수량: sf.quantity, 기록시각: sf.recordedAt }; }
+function toServerFood(f) { return { name: f.이름, calorie: f.칼로리, digestTime: f.소화시간, isTrigger: f.트리거 || false, meal: f.끼니 || null, quantity: f.수량, recordedAt: f.기록시각 || null, fatGrams: f.지방 ?? null }; }
+function fromServerFood(sf) { return { id: sf.id, 이름: sf.name, 칼로리: sf.calorie, 소화시간: sf.digestTime, 트리거: sf.isTrigger, 끼니: sf.meal, 수량: sf.quantity, 기록시각: sf.recordedAt, 지방: sf.fatGrams }; }
 
 function toServerRun(r) { return { distance: r.거리, time: r.시간, heartRate: r.심박수, speedKmh: r.시속, calorieBurned: r.칼로리, recordedAt: r.기록시각 || null }; }
 function fromServerRun(sr) { return { id: sr.id, 거리: sr.distance, 시간: sr.time, 심박수: sr.heartRate, 시속: sr.speedKmh, 칼로리: sr.calorieBurned, 기록시각: sr.recordedAt }; }
@@ -95,6 +93,10 @@ const foodDateTargetBanner = document.getElementById("food-date-target-banner");
 const foodDateTargetCloseBtn = document.getElementById("food-date-target-close-btn");
 const mealButtons = document.querySelectorAll(".meal-btn");
 const mealButtonsRow = document.getElementById("meal-buttons");
+
+const foodSearchInput = document.getElementById("food-search-input");
+const foodSearchBtn = document.getElementById("food-search-btn");
+const foodSearchResults = document.getElementById("food-search-results");
 
 const dietCalendarToggleBtn = document.getElementById("diet-calendar-toggle-btn");
 const dietCalendarBox = document.getElementById("diet-calendar-box");
@@ -257,6 +259,11 @@ function clearMealIfOutside(e) {
 function renderQuickAddList() {
     quickAddList.innerHTML = "";
 
+    if (foods.length === 0) {
+        quickAddList.innerHTML = `<div class="search-empty">아직 즐겨찾기한 음식이 없어요 — 검색이나 직접 추가 후 "즐겨찾기" 버튼을 눌러보세요</div>`;
+        return;
+    }
+
     foods.forEach(function (food, index) {
         const card = document.createElement("div");
         card.className = "food-card";
@@ -327,42 +334,7 @@ function renderQuickAddList() {
                     return;
                 }
 
-                // 낮밤이 바뀌거나 늦게 일어나는 사람 등 변수가 많아 자동 판단 대신 항상 직접 선택하게 함
-                if (selectedMeal === null) {
-                    alert("끼니를 먼저 선택해주세요!");
-                    return;
-                }
-
-                // 달력에서 "이 날짜로 음식 추가"를 눌러둔 상태면 그 날짜로, 아니면 평소처럼 서버가 현재 시각으로 저장
-                const foodToSave = { ...food, 끼니: selectedMeal };
-                if (pendingCalendarDate) {
-                    foodToSave.기록시각 = dateWithCurrentTime(pendingCalendarDate);
-                }
-
-                const response = await apiFetch(`${API_BASE}/foods`, {
-                    method: "POST",
-                    credentials: "include",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(toServerFood(foodToSave))
-                });
-                const saved = await response.json();
-                const savedFood = fromServerFood(saved);
-                // 서버가 같은 날짜·끼니의 기존 항목에 합쳐서 응답한 경우 같은 id가 이미 배열에 있으므로,
-                // 그대로 push하면 화면에 중복으로 보임 — 있으면 교체, 없으면 새로 추가
-                const existingIndex = todayFoods.findIndex(function (f) { return f.id === savedFood.id; });
-                if (existingIndex >= 0) {
-                    todayFoods[existingIndex] = savedFood;
-                } else {
-                    todayFoods.push(savedFood);
-                }
-                renderFoodList();
-
-                // pendingCalendarDate는 배너 닫기 버튼이나 달력을 닫을 때까지 유지 —
-                // 즐겨찾기를 연달아 눌러도 매번 "이 날짜로 추가"를 다시 누를 필요 없게 함
-                if (pendingCalendarDate) {
-                    loadCalendarSummary(calendarYear, calendarMonth);
-                    if (selectedCalendarDate === pendingCalendarDate) loadCalendarDetail(pendingCalendarDate);
-                }
+                await addFoodRecordToToday(food);
             });
         }
     });
@@ -370,6 +342,120 @@ function renderQuickAddList() {
 
 function saveFoods() {
     localStorage.setItem("foods", JSON.stringify(foods));
+}
+
+// 즐겨찾기 pill 클릭과 검색결과 "추가" 버튼이 공유하는 로직 — 끼니 선택 확인 후
+// 서버에 POST하고, 서버의 중복 합치기 응답(quantity 누적)을 오늘 목록에 반영함
+async function addFoodRecordToToday(food) {
+    // 낮밤이 바뀌거나 늦게 일어나는 사람 등 변수가 많아 자동 판단 대신 항상 직접 선택하게 함
+    if (selectedMeal === null) {
+        alert("끼니를 먼저 선택해주세요!");
+        return;
+    }
+
+    // 달력에서 "이 날짜로 음식 추가"를 눌러둔 상태면 그 날짜로, 아니면 평소처럼 서버가 현재 시각으로 저장
+    const foodToSave = { ...food, 끼니: selectedMeal };
+    if (pendingCalendarDate) {
+        foodToSave.기록시각 = dateWithCurrentTime(pendingCalendarDate);
+    }
+
+    const response = await apiFetch(`${API_BASE}/foods`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(toServerFood(foodToSave))
+    });
+    const saved = await response.json();
+    const savedFood = fromServerFood(saved);
+    // 서버가 같은 날짜·끼니의 기존 항목에 합쳐서 응답한 경우 같은 id가 이미 배열에 있으므로,
+    // 그대로 push하면 화면에 중복으로 보임 — 있으면 교체, 없으면 새로 추가
+    const existingIndex = todayFoods.findIndex(function (f) { return f.id === savedFood.id; });
+    if (existingIndex >= 0) {
+        todayFoods[existingIndex] = savedFood;
+    } else {
+        todayFoods.push(savedFood);
+    }
+    renderFoodList();
+
+    // pendingCalendarDate는 배너 닫기 버튼이나 달력을 닫을 때까지 유지 —
+    // 즐겨찾기를 연달아 눌러도 매번 "이 날짜로 추가"를 다시 누를 필요 없게 함
+    if (pendingCalendarDate) {
+        loadCalendarSummary(calendarYear, calendarMonth);
+        if (selectedCalendarDate === pendingCalendarDate) loadCalendarDetail(pendingCalendarDate);
+    }
+}
+
+// 식약처 API가 준 실제 지방(g)을 소화시간 카테고리(2/3/4)로 자동 변환 — 검색으로 추가한 음식은
+// 사용자가 🟢🟡🔴을 직접 고르지 않고 이 값으로 채워짐. API에 지방 정보가 없는 항목은 "보통(3)"으로 기본 처리
+function fatGramsToDigestCategory(fatGrams) {
+    if (fatGrams === null || fatGrams === undefined || Number.isNaN(fatGrams)) return 3;
+    if (fatGrams < 10) return 2;
+    if (fatGrams <= 25) return 3;
+    return 4;
+}
+
+// 위 함수의 반대 방향 근사값 — 지방 실측값(food.지방)이 없을 때만 쓰는 대체 로직.
+// 즐겨찾기 수동 등록 등 정확한 그램수를 모르는 음식은 카테고리만 있으므로, 끼니 단위로
+// 합산할 때(mealCompleteBtn 참고) 각 카테고리를 대표하는 지방값으로 되돌려 더함
+// (5g=가벼움 대표, 15g=보통 대표, 30g=무거움 대표 — 아래 10g/25g 기준 버킷 안에 들어오도록 고름)
+function digestCategoryToRepresentativeFat(category) {
+    const n = Number(category);
+    if (n <= 2) return 5;
+    if (n === 3) return 15;
+    return 30;
+}
+
+// 음식 검색 — 식약처 식품영양성분DB를 프록시하는 백엔드(/api/food-search)를 거쳐서 호출
+// (프론트가 식약처 API를 직접 호출하지 않는 이유는 인증키를 프론트에 노출시키지 않기 위함)
+async function searchFoodApi(keyword) {
+    if (!keyword || !keyword.trim()) return;
+    const response = await apiFetch(`${API_BASE}/food-search?keyword=${encodeURIComponent(keyword.trim())}`, {
+        credentials: "include"
+    });
+    const results = await response.json();
+    renderFoodSearchResults(results);
+}
+
+// 검색 결과 목록 렌더링 — 항목마다 "오늘 기록에 추가"(즐겨찾기 pill과 동일한 addFoodRecordToToday 재사용)
+// / "즐겨찾기 등록"(foods 배열에 push, 다음부턴 검색 없이 pill로 원터치 가능) 버튼을 둠
+function renderFoodSearchResults(results) {
+    foodSearchResults.innerHTML = "";
+
+    if (results.length === 0) {
+        foodSearchResults.innerHTML = `<div class="search-empty">검색 결과가 없어요</div>`;
+        return;
+    }
+
+    results.forEach(function (result) {
+        const row = document.createElement("div");
+        row.className = "search-result-row";
+        row.innerHTML = `
+            <div class="search-result-info">
+                <span class="search-result-name">${result.name}</span>
+                <span class="search-result-kcal">${result.calorie ?? "?"} kcal (1인분 기준)</span>
+            </div>
+            <div class="search-result-actions">
+                <button type="button" class="btn-add-small">➕ 추가</button>
+                <button type="button" class="btn-fav-small">⭐ 즐겨찾기</button>
+            </div>
+        `;
+
+        row.querySelector(".btn-add-small").addEventListener("click", async function () {
+            const digestCategory = fatGramsToDigestCategory(result.fat);
+            await addFoodRecordToToday({ 이름: result.name, 칼로리: result.calorie || 0, 소화시간: digestCategory, 트리거: false, 지방: result.fat });
+        });
+
+        row.querySelector(".btn-fav-small").addEventListener("click", function () {
+            const digestCategory = fatGramsToDigestCategory(result.fat);
+            // 검색 결과를 즐겨찾기로 등록해도 출처는 API이므로 정확한 지방값을 계속 들고 다니게 함
+            // (나중에 이 pill을 눌러 오늘 기록에 추가할 때도 근사치가 아니라 정확치가 이어짐)
+            foods.push({ 이름: result.name, 칼로리: result.calorie || 0, 소화시간: digestCategory, 트리거: false, 지방: result.fat });
+            saveFoods();
+            renderQuickAddList();
+        });
+
+        foodSearchResults.appendChild(row);
+    });
 }
 
 // 서버에서 "오늘"에 해당하는 음식 목록만 가져오기
@@ -1212,23 +1298,59 @@ calendarAddMemoBtn.addEventListener("click", function () {
     infoScreen.scrollTo({ top: targetTop, behavior: "smooth" });
 });
 
-// "식사 완료" 버튼 클릭 시: 가장 오래 걸리는 소화시간을 찾아서 끝나는 시각을 저장하고 타이머 시작
+// "식사 완료" 버튼 클릭 시: 개별 음식이 아니라 "지금 선택된 끼니"에 추가된 음식들의 지방을
+// 합산해서 소화시간을 판단 — 실제 식사는 여러 음식을 같이 먹으므로, 음식 하나만 보고 판단하면
+// 그 끼니 전체의 위 부담을 과소평가할 수 있음
+//
+// 출처: 지방 함량이 높을수록 위 배출 시간이 길어져 역류 위험이 높아진다는 원리는 GERD 관련 의학 자료
+// (대한소화기학회 등 국내 임상 자료, 서울아산병원 등 의료기관 자료)에서 확인됨. 다만 정확한 그램
+// 구간(10g/25g)은 논문 수치를 그대로 인용한 것이 아니라, 이 원리를 바탕으로 대표 음식(삼겹살,
+// 비빔밥, 아이스크림 등)의 실제 지방 함량을 참고해 이 프로젝트에서 실용적으로 설계한 기준임
 mealCompleteBtn.addEventListener("click", function () {
+    if (selectedMeal === null) {
+        alert("끼니를 먼저 선택해주세요!");
+        return;
+    }
 
-    let maxTime = 0;
-    todayFoods.forEach(function (food) {
-        if (food.소화시간 > maxTime) {
-            maxTime = food.소화시간;
-        }
+    const mealFoods = todayFoods.filter(function (food) { return food.끼니 === selectedMeal; });
+    if (mealFoods.length === 0) {
+        alert("먼저 음식을 추가해주세요!");
+        return;
+    }
+
+    // 지방 실측값(검색으로 추가한 음식)이 있으면 그대로, 없으면(즐겨찾기 수동 등록 등) 근사값으로
+    // 대체하는 혼합 계산 — 정확한 데이터가 있는 만큼 합산 정확도를 끌어올림
+    let fatSum = 0;
+    mealFoods.forEach(function (food) {
+        fatSum += (food.지방 != null) ? food.지방 : digestCategoryToRepresentativeFat(food.소화시간);
     });
 
-    const totalSeconds = maxTime * 3600;
-    const endTime = Date.now() + (totalSeconds * 1000);
+    let mealHours;
+    if (fatSum < 10) mealHours = 2;
+    else if (fatSum <= 25) mealHours = 3;
+    else mealHours = 4;
+
+    const newTotalSeconds = mealHours * 3600;
+
+    // 이미 타이머가 돌고 있으면 "지금 남은 시간"과 "이번에 새로 계산된 시간" 중 더 긴 쪽으로 갱신
+    // — 안전 마진이 줄어드는 방향(예: 무거운 끼니로 4시간 남은 상태에서 가벼운 간식으로 2시간으로 단축)
+    // 으로는 절대 안 바뀌게 함
+    const savedEndTime = localStorage.getItem("digestEndTime");
+    let finalRemaining = newTotalSeconds;
+    let finalTotal = newTotalSeconds;
+    if (savedEndTime) {
+        const existingRemaining = Math.max(0, Math.round((Number(savedEndTime) - Date.now()) / 1000));
+        if (existingRemaining > newTotalSeconds) {
+            finalRemaining = existingRemaining;
+            finalTotal = Number(localStorage.getItem("digestTotalSeconds")) || existingRemaining;
+        }
+    }
+
+    const endTime = Date.now() + (finalRemaining * 1000);
     localStorage.setItem("digestEndTime", endTime);
-    localStorage.setItem("digestTotalSeconds", totalSeconds);
+    localStorage.setItem("digestTotalSeconds", finalTotal);
 
-    startDigestTimer(totalSeconds, endTime, totalSeconds);
-
+    startDigestTimer(finalRemaining, endTime, finalTotal);
 });
 
 // "타이머 취소" 버튼 클릭 시: 타이머 정지 + 저장된 끝나는 시각 삭제 + 화면 초기화
@@ -1250,6 +1372,14 @@ digestCancelBtn.addEventListener("click", function () {
 });
 
 // 끼니(아침/점심/저녁/간식) 버튼 클릭 시: 선택 표시 토글 + selectedMeal 값 저장
+// "음식 검색" 버튼 클릭 또는 검색창에서 Enter 입력 시 식약처 API 검색 실행
+foodSearchBtn.addEventListener("click", function () {
+    searchFoodApi(foodSearchInput.value);
+});
+foodSearchInput.addEventListener("keydown", function (e) {
+    if (e.key === "Enter") searchFoodApi(foodSearchInput.value);
+});
+
 // (성별/활동량 버튼과 같은 패턴 — 한 번 선택하면 다른 걸 누르기 전까지 유지)
 mealButtons.forEach(function (btn) {
     btn.addEventListener("click", function () {
