@@ -1,0 +1,7 @@
+{
+  "rewrites": [
+    { "source": "/api/:path*", "destination": "https://health-project-production-5204.up.railway.app/api/:path*" },
+    { "source": "/oauth2/:path*", "destination": "https://health-project-production-5204.up.railway.app/oauth2/:path*" },
+    { "source": "/login/:path*", "destination": "https://health-project-production-5204.up.railway.app/login/:path*" }
+  ]
+}

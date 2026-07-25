@@ -21,7 +21,7 @@
       <div class="login-gate-emoji">🩺</div>
       <div class="login-gate-title">건강 케어 & 러닝 트래커</div>
       <div class="login-gate-sub">로그인하고 나만의 기록을 시작하세요</div>
-      <a id="kakao-login-link" href="https://health-project-production-5204.up.railway.app/oauth2/authorization/kakao" class="btn-kakao">카카오로 로그인</a>
+      <a id="kakao-login-link" href="/oauth2/authorization/kakao" class="btn-kakao">카카오로 로그인</a>
     </div>
   </div>
 
@@ -159,10 +159,11 @@
               <button type="button" class="digest-btn" data-digest="4">🔴 무거움</button>
             </div>
 
-            <p id="digest-guide-text" class="guide-text">
-              💡 지방 함량 기준: 5g↓ 🟢 · 6~15g 🟡 · 16g↑ 🔴<br>
-              예: 🟢바나나·달걀 🟡밥·닭가슴살 🔴튀김·삼겹살
-            </p>
+            <div id="digest-guide-text" class="digest-example-row">
+              <span>예: 닭가슴살·흰쌀밥·바나나·삶은 달걀</span>
+              <span>예: 연어·소고기 살코기</span>
+              <span>예: 삼겹살·튀김류(치킨·돈까스)</span>
+            </div>
 
             <label class="trigger-check-label">
               <input type="checkbox" id="food-trigger-input"> ⚠️ 트리거 음식(역류 유발 가능)

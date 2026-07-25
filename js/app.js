@@ -1,12 +1,13 @@
 // ===== ① 데이터 =====
 
 // 서버 주소 (백엔드가 살아있는 곳)
-// 로컬(Live Server, localhost)에서 열었으면 로컬 백엔드를, 배포(Vercel)에서 열었으면
-// 배포된 Railway 백엔드를 자동으로 봄
-const BACKEND_ORIGIN = window.location.hostname === "localhost"
-    ? "http://localhost:8080"
-    : "https://health-project-production-5204.up.railway.app";
-const API_BASE = `${BACKEND_ORIGIN}/api`;
+// 로컬(Live Server, localhost)에서 열었으면 로컬 백엔드를 절대주소로 직접 호출.
+// 배포(Vercel)에서는 상대경로 "/api"를 씀 — vercel.json의 rewrites가 이걸 Railway로 프록시해줘서,
+// 브라우저 입장에선 같은 도메인 요청처럼 보이게 됨(iOS Safari ITP가 크로스 도메인 쿠키를 세션
+// 유지에 못 쓰게 막는 문제를 이 방식으로 우회 — 자세한 이유는 vercel.json 참고)
+const API_BASE = window.location.hostname === "localhost"
+    ? "http://localhost:8080/api"
+    : "/api";
 
 // --- 식단: 자주 먹는 음식 관련 ---
 // 개발 중 테스트용으로 넣어뒀던 기본 즐겨찾기(바나나/닭가슴살/삼겹살)를 제거함 —
@@ -1705,10 +1706,11 @@ document.addEventListener('DOMContentLoaded', function () {
 
 // ===== ⑤ 초기 실행 =====
 
-// index.html의 카카오 로그인 링크는 기본값이 배포 주소로 박혀있음(배포 환경에서 안전한 기본값) —
-// 로컬(localhost)에서 열었을 때만 로컬 백엔드 주소로 되돌림
+// index.html의 카카오 로그인 링크는 기본값이 상대경로("/oauth2/...")로 박혀있음(배포 환경에서
+// vercel.json 프록시를 타는 안전한 기본값) — 로컬(localhost)에서 열었을 때만 로컬 백엔드
+// 절대주소로 되돌림 (로컬은 프록시가 없어 상대경로로는 백엔드에 못 닿기 때문)
 if (window.location.hostname === "localhost") {
-    kakaoLoginLink.href = `${BACKEND_ORIGIN}/oauth2/authorization/kakao`;
+    kakaoLoginLink.href = "http://localhost:8080/oauth2/authorization/kakao";
 }
 
 // 로그인 안 했으면 login-gate가 이미 보이는 상태로 대기 — 데이터 로드 자체를 생략함

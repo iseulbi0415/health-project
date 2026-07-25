@@ -572,6 +572,21 @@ textarea.inp {
   color: var(--blue);
 }
 
+/* 카테고리 버튼과 같은 flex:1/폭으로 맞춰서, 예시 문구가 각자 버튼 바로 아래에 오도록 함 */
+.digest-example-row {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.digest-example-row span {
+  flex: 1;
+  min-width: 80px;
+  font-size: 11px;
+  color: var(--text-gray);
+  text-align: center;
+  line-height: 1.4;
+}
+
 .guide-text {
   font-size: 12px;
   color: var(--text-gray);
