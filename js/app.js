@@ -255,6 +255,15 @@ function clearMealIfOutside(e) {
     });
 }
 
+// 검색 결과 바깥을 클릭하면 목록 닫기 (위 clearMealIfOutside와 같은 패턴) — 지금은 따로 닫는
+// 버튼이 없어서 검색만 하면 결과가 계속 화면에 남아있던 문제 대응. 검색창/검색버튼 클릭은
+// "바깥"으로 안 침 — 재검색하는 도중에 결과가 먼저 사라지면 안 되니까
+function clearFoodSearchResultsIfOutside(e) {
+    if (foodSearchResults.innerHTML === "") return;
+    if (foodSearchResults.contains(e.target) || foodSearchInput.contains(e.target) || foodSearchBtn.contains(e.target)) return;
+    foodSearchResults.innerHTML = "";
+}
+
 // --- 식단 관련 함수 ---
 // 자주 먹는 음식 빠른 추가 버튼 다시 그리기
 function renderQuickAddList() {
@@ -1676,6 +1685,7 @@ document.addEventListener("click", function (e) {
     closeIfOutside(runList, openRunIndex, function (v) { openRunIndex = v; }, renderRunList, e);
     closeIfOutside(memoList, openMemoIndex, function (v) { openMemoIndex = v; }, renderMemoList, e);
     clearMealIfOutside(e);
+    clearFoodSearchResultsIfOutside(e);
 });
 
 // --- 전역(탭바) ---
