@@ -41,6 +41,9 @@ public class SecurityConfig {
             .cors(Customizer.withDefaults())
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers(mvc.matcher("/api/auth/me")).permitAll()
+                // 네이티브 앱 카카오 로그인 진입점(NativeKakaoAuthController) — 로그인 전 상태에서 호출되므로 인증 예외
+                // (다른 웹 로그인 관련 설정(oauth2Login/logout/CORS)은 이 기능을 위해 변경하지 않음)
+                .requestMatchers(mvc.matcher("/api/auth/kakao/native")).permitAll()
                 .requestMatchers(apiMatcher).authenticated()
                 .anyRequest().permitAll()
             )

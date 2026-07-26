@@ -94,6 +94,10 @@ const foodDateTargetBanner = document.getElementById("food-date-target-banner");
 const foodDateTargetCloseBtn = document.getElementById("food-date-target-close-btn");
 const mealButtons = document.querySelectorAll(".meal-btn");
 const mealButtonsRow = document.getElementById("meal-buttons");
+// 끼니 선택/음식 검색/즐겨찾기 목록이 전부 이 카드 하나 안에 같이 있음 — 바깥 클릭 판정 기준으로
+// 카드 전체를 씀(개별 요소를 하나씩 나열하면, 서로가 서로를 "바깥"으로 오인해서 끼니 선택하면
+// 검색결과가 닫히고 검색하면 끼니가 풀리는 문제가 생김)
+const quickAddCard = document.getElementById("quick-add-card");
 
 const foodSearchInput = document.getElementById("food-search-input");
 const foodSearchBtn = document.getElementById("food-search-btn");
@@ -244,11 +248,11 @@ function closeIfOutside(container, openIndex, setOpenIndex, renderFn, e) {
 }
 
 // 끼니 선택 pill 바깥을 클릭하면 선택 표시 해제 (위 closeIfOutside와 같은 패턴).
-// 단, 즐겨찾기 음식 pill(quickAddList) 클릭은 "바깥"으로 치지 않음 — 그렇게 치면
-// 즐겨찾기로 음식을 추가할 때마다 끼니를 매번 다시 선택해야 해서 연속 추가가 안 됨
+// 단, quickAddCard(끼니 pill+검색+즐겨찾기 목록이 다 같이 있는 카드) 안 클릭은 "바깥"으로
+// 치지 않음 — 그렇게 치면 검색창을 클릭하거나 검색 결과에서 추가하는 동안 끼니 선택이 풀림
 function clearMealIfOutside(e) {
     if (selectedMeal === null) return;
-    if (mealButtonsRow.contains(e.target) || quickAddList.contains(e.target)) return;
+    if (quickAddCard.contains(e.target)) return;
     selectedMeal = null;
     mealButtons.forEach(function (b) {
         b.classList.remove("selected");
@@ -256,11 +260,11 @@ function clearMealIfOutside(e) {
 }
 
 // 검색 결과 바깥을 클릭하면 목록 닫기 (위 clearMealIfOutside와 같은 패턴) — 지금은 따로 닫는
-// 버튼이 없어서 검색만 하면 결과가 계속 화면에 남아있던 문제 대응. 검색창/검색버튼 클릭은
-// "바깥"으로 안 침 — 재검색하는 도중에 결과가 먼저 사라지면 안 되니까
+// 버튼이 없어서 검색만 하면 결과가 계속 화면에 남아있던 문제 대응. 마찬가지로 quickAddCard 안
+// 클릭(끼니 선택 등)은 "바깥"으로 안 침 — 그렇게 치면 끼니를 고르는 순간 검색 결과가 닫혀버림
 function clearFoodSearchResultsIfOutside(e) {
     if (foodSearchResults.innerHTML === "") return;
-    if (foodSearchResults.contains(e.target) || foodSearchInput.contains(e.target) || foodSearchBtn.contains(e.target)) return;
+    if (quickAddCard.contains(e.target)) return;
     foodSearchResults.innerHTML = "";
 }
 
