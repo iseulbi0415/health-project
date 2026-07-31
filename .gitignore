@@ -1,0 +1,8 @@
+### macOS ###
+.DS_Store
+
+### Xcode ###
+# 각자 컴퓨터에서만 의미 있는 개인 UI 상태(열어둔 파일, 창 배치 등) — 계속 바뀌어서 매번 git에 잡히는 원인
+xcuserdata/
+*.xcuserstate
+DerivedData/
