@@ -33,6 +33,7 @@ struct ProfileView: View {
     @State private var recentMemos: [MemoRecord] = []
     @State private var isLoadingMemos = false
     @State private var memosErrorMessage: String?
+    @State private var editingMemo: MemoRecord?
 
     var body: some View {
         NavigationStack {
@@ -104,6 +105,21 @@ struct ProfileView: View {
                                     .foregroundStyle(.secondary)
                             }
                             .padding(.vertical, 2)
+                            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                Button("삭제", role: .destructive) {
+                                    Task { await deleteMemo(memo) }
+                                }
+                            }
+                            .swipeActions(edge: .leading) {
+                                Button("수정") { editingMemo = memo }
+                                    .tint(.blue)
+                            }
+                            .contextMenu {
+                                Button("수정") { editingMemo = memo }
+                                Button("삭제", role: .destructive) {
+                                    Task { await deleteMemo(memo) }
+                                }
+                            }
                         }
                     }
                 }
@@ -125,7 +141,15 @@ struct ProfileView: View {
             } message: {
                 Text(memoAlertMessage ?? "")
             }
+            .sheet(item: $editingMemo) { memo in
+                MemoEditView(memo: memo, onSaved: {
+                    Task { await loadRecentMemos() }
+                })
+            }
             .task {
+                await loadRecentMemos()
+            }
+            .refreshable {
                 await loadRecentMemos()
             }
         }
@@ -187,6 +211,16 @@ struct ProfileView: View {
                 memoAlertMessage = "저장 실패: \(error.localizedDescription)"
                 showMemoAlert = true
             }
+        }
+    }
+
+    private func deleteMemo(_ memo: MemoRecord) async {
+        do {
+            try await MemoAPIService.deleteMemo(id: memo.id)
+            Haptics.success()
+            await loadRecentMemos()
+        } catch {
+            memosErrorMessage = "삭제 실패: \(error.localizedDescription)"
         }
     }
 

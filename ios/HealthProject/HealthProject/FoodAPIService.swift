@@ -77,6 +77,62 @@ enum FoodAPIService {
         return try JSONDecoder().decode(FoodRecord.self, from: data)
     }
 
+    // recordedAt은 항상 nil로 보냄 — FoodController.updateFood가 nil이면 기존 저장 시각을 그대로 유지함
+    static func updateFood(id: Int, name: String, calorie: Int, digestTime: String, isTrigger: Bool, meal: Meal, quantity: Int, fatGrams: Double? = nil) async throws -> FoodRecord {
+        guard let url = URL(string: "\(baseURL)/api/foods/\(id)") else {
+            throw URLError(.badURL)
+        }
+
+        let body = NewFoodRequest(
+            name: name,
+            calorie: calorie,
+            digestTime: digestTime,
+            isTrigger: isTrigger,
+            meal: meal.rawValue,
+            quantity: quantity,
+            recordedAt: nil,
+            fatGrams: fatGrams
+        )
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "PUT"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONEncoder().encode(body)
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw URLError(.badServerResponse)
+        }
+        guard (200...299).contains(httpResponse.statusCode) else {
+            if httpResponse.statusCode == 401 {
+                AuthManager.shared.logout()
+            }
+            throw URLError(.userAuthenticationRequired)
+        }
+
+        return try JSONDecoder().decode(FoodRecord.self, from: data)
+    }
+
+    static func deleteFood(id: Int) async throws {
+        guard let url = URL(string: "\(baseURL)/api/foods/\(id)") else {
+            throw URLError(.badURL)
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "DELETE"
+
+        let (_, response) = try await URLSession.shared.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw URLError(.badServerResponse)
+        }
+        guard (200...299).contains(httpResponse.statusCode) else {
+            if httpResponse.statusCode == 401 {
+                AuthManager.shared.logout()
+            }
+            throw URLError(.userAuthenticationRequired)
+        }
+    }
+
     static func searchFoods(keyword: String) async throws -> [FoodSearchResult] {
         let encodedKeyword = keyword.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? keyword
         guard let url = URL(string: "\(baseURL)/api/food-search?keyword=\(encodedKeyword)") else {
