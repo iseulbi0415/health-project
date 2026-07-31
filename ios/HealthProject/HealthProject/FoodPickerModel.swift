@@ -51,8 +51,22 @@ final class FoodPickerModel: ObservableObject {
         saveFavorites()
     }
 
+    // .swipeActions/.contextMenu는 인덱스가 아니라 항목 자체를 넘겨주기 때문에 IndexSet 버전과 별도로 필요
+    func deleteFavorite(_ favorite: FavoriteFood) {
+        favorites.removeAll { $0.id == favorite.id }
+        saveFavorites()
+        Haptics.success()
+    }
+
     func addNewFavorite(_ favorite: FavoriteFood) {
         favorites.append(favorite)
+        saveFavorites()
+    }
+
+    // id는 그대로 유지한 채 나머지 필드만 교체 — 로컬 전용이라 서버 호출 없이 바로 반영됨
+    func updateFavorite(_ favorite: FavoriteFood) {
+        guard let index = favorites.firstIndex(where: { $0.id == favorite.id }) else { return }
+        favorites[index] = favorite
         saveFavorites()
     }
 

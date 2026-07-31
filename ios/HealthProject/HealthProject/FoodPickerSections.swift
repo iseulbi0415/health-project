@@ -26,6 +26,8 @@ struct FoodPickerSections: View {
         let name: String
     }
     @State private var fallbackTarget: FallbackPrefillTarget?
+    // 즐겨찾기 스와이프/컨텍스트 메뉴 "수정"에서 열리는 편집 시트 대상
+    @State private var editingFavorite: FavoriteFood?
 
     private var addButtonLabel: String {
         recordedAt == nil ? "오늘 먹었어요" : "이 날짜로 추가"
@@ -68,8 +70,21 @@ struct FoodPickerSections: View {
                         }
                         .buttonStyle(.bordered)
                     }
+                    // allowsFullSwipe: true — 끝까지 밀면 확인 없이 바로 삭제(메일 앱과 동일한 iOS 표준 동작)
+                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                        Button("삭제", role: .destructive) {
+                            model.deleteFavorite(favorite)
+                        }
+                    }
+                    .swipeActions(edge: .leading) {
+                        Button("수정") { editingFavorite = favorite }
+                            .tint(.blue)
+                    }
+                    .contextMenu {
+                        Button("수정") { editingFavorite = favorite }
+                        Button("삭제", role: .destructive) { model.deleteFavorite(favorite) }
+                    }
                 }
-                .onDelete(perform: model.deleteFavorites)
             }
         }
         .alert("확인해주세요", isPresented: $model.showAlert) {
@@ -80,6 +95,11 @@ struct FoodPickerSections: View {
         .sheet(item: $fallbackTarget) { target in
             FavoriteAddView(initialName: target.name, onSave: { favorite in
                 model.addNewFavorite(favorite)
+            })
+        }
+        .sheet(item: $editingFavorite) { favorite in
+            FavoriteAddView(existingFavorite: favorite, onSave: { updated in
+                model.updateFavorite(updated)
             })
         }
     }

@@ -14,15 +14,32 @@ struct RunAddView: View {
     // nil이면 서버가 현재시각으로 채움(오늘 기록), 특정 날짜+시각 문자열이면 그 날짜로 저장됨
     // (DayDetailView의 "이 날짜로 러닝 추가"에서만 값을 넘김 — 기존 호출부는 그대로 nil)
     var recordedAt: String? = nil
+    // nil이면 신규 등록, 값이 있으면 수정 모드(스와이프/컨텍스트 메뉴 "수정"에서 진입) — id를 대상으로 updateRun 호출
+    var existingRun: RunRecord? = nil
 
     @Environment(\.dismiss) private var dismiss
 
-    @State private var distanceText = ""     // km
-    @State private var timeText = ""         // "mm:ss" 형식 (웹과 동일한 입력 관례)
-    @State private var heartRateText = ""    // bpm
+    @State private var distanceText: String     // km
+    @State private var timeText: String         // "mm:ss" 형식 (웹과 동일한 입력 관례)
+    @State private var heartRateText: String    // bpm
     @State private var isSaving = false
     @State private var showAlert = false
     @State private var alertMessage = ""
+
+    init(onSaved: @escaping () -> Void, recordedAt: String? = nil, existingRun: RunRecord? = nil) {
+        self.onSaved = onSaved
+        self.recordedAt = recordedAt
+        self.existingRun = existingRun
+        self._distanceText = State(initialValue: existingRun.map { String($0.distance) } ?? "")
+        self._timeText = State(initialValue: existingRun.map { RunAddView.mmss(from: $0.time) } ?? "")
+        self._heartRateText = State(initialValue: existingRun.map { String($0.heartRate) } ?? "")
+    }
+
+    // RunRecord.time(분, 소수)을 입력창의 "mm:ss" 표기로 되돌리는 역변환 — parseTotalMinutes()의 반대
+    private static func mmss(from totalMinutes: Double) -> String {
+        let totalSeconds = Int((totalMinutes * 60).rounded())
+        return String(format: "%d:%02d", totalSeconds / 60, totalSeconds % 60)
+    }
 
     var body: some View {
         NavigationStack {
@@ -36,7 +53,7 @@ struct RunAddView: View {
                         .keyboardType(.numberPad)
                 }
             }
-            .navigationTitle("기록 추가")
+            .navigationTitle(existingRun == nil ? "기록 추가" : "기록 수정")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("취소") { dismiss() }
@@ -106,8 +123,13 @@ struct RunAddView: View {
         isSaving = true
         Task {
             do {
-                _ = try await RunAPIService.createRun(distance: distance, totalMinutes: totalMinutes, heartRate: heartRate, recordedAt: recordedAt)
+                if let existingRun {
+                    _ = try await RunAPIService.updateRun(id: existingRun.id, distance: distance, totalMinutes: totalMinutes, heartRate: heartRate)
+                } else {
+                    _ = try await RunAPIService.createRun(distance: distance, totalMinutes: totalMinutes, heartRate: heartRate, recordedAt: recordedAt)
+                }
                 isSaving = false
+                Haptics.success()
                 onSaved()
             } catch {
                 isSaving = false

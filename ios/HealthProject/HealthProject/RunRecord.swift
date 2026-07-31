@@ -19,6 +19,8 @@ struct RunRecord: Codable, Identifiable {
     let heartRate: Int
     let speedKmh: Double
     let calorieBurned: Double
+    // ISO datetime 문자열(예: "2026-07-31T14:30:00") — 앞 10자리(yyyy-MM-dd)만 relativeDateDisplay에서 씀
+    let recordedAt: String?
 
     // "N분 M초" 형태로 바꿔서 화면에 보여주기 위한 계산 프로퍼티
     // (계산 프로퍼티: 값을 저장하지 않고, 호출할 때마다 즉석에서 계산해서 돌려주는 프로퍼티)
@@ -37,5 +39,30 @@ struct RunRecord: Codable, Identifiable {
         let paceMinutes = paceTotalSeconds / 60
         let paceSeconds = paceTotalSeconds % 60
         return String(format: "%d'%02d\"", paceMinutes, paceSeconds)
+    }
+
+    private static let dateOnlyFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter
+    }()
+
+    // "오늘"/"어제"/"N일 전"(2~6일) 상대 표기, 일주일 이상 지났으면 "yyyy-MM-dd" 절대 날짜로 표시
+    var relativeDateDisplay: String {
+        guard let recordedAt, recordedAt.count >= 10 else { return "" }
+        let dateOnly = String(recordedAt.prefix(10))
+        guard let recordDate = Self.dateOnlyFormatter.date(from: dateOnly) else { return dateOnly }
+
+        let calendar = Calendar.current
+        let startOfRecord = calendar.startOfDay(for: recordDate)
+        let startOfToday = calendar.startOfDay(for: Date())
+        let daysAgo = calendar.dateComponents([.day], from: startOfRecord, to: startOfToday).day ?? 0
+
+        switch daysAgo {
+        case 0: return "오늘"
+        case 1: return "어제"
+        case 2...6: return "\(daysAgo)일 전"
+        default: return dateOnly
+        }
     }
 }

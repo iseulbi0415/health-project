@@ -109,6 +109,61 @@ enum RunAPIService {
         return try JSONDecoder().decode(RunRecord.self, from: data)
     }
 
+    // recordedAt은 항상 nil로 보냄 — RunController.updateRun이 nil이면 기존 저장 시각을 그대로 유지함
+    static func updateRun(id: Int, distance: Double, totalMinutes: Double, heartRate: Int) async throws -> RunRecord {
+        guard let url = URL(string: "\(baseURL)/api/runs/\(id)") else {
+            throw URLError(.badURL)
+        }
+
+        let stats = calculateRunStats(distance: distance, totalMinutes: totalMinutes)
+        let body = NewRunRequest(
+            distance: distance,
+            time: totalMinutes,
+            heartRate: heartRate,
+            speedKmh: stats.speedKmh,
+            calorieBurned: stats.caloriesBurned,
+            recordedAt: nil
+        )
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "PUT"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONEncoder().encode(body)
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw URLError(.badServerResponse)
+        }
+        guard (200...299).contains(httpResponse.statusCode) else {
+            if httpResponse.statusCode == 401 {
+                AuthManager.shared.logout()
+            }
+            throw RunAPIError.httpError(statusCode: httpResponse.statusCode, body: String(data: data, encoding: .utf8))
+        }
+
+        return try JSONDecoder().decode(RunRecord.self, from: data)
+    }
+
+    static func deleteRun(id: Int) async throws {
+        guard let url = URL(string: "\(baseURL)/api/runs/\(id)") else {
+            throw URLError(.badURL)
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "DELETE"
+
+        let (_, response) = try await URLSession.shared.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw URLError(.badServerResponse)
+        }
+        guard (200...299).contains(httpResponse.statusCode) else {
+            if httpResponse.statusCode == 401 {
+                AuthManager.shared.logout()
+            }
+            throw URLError(.userAuthenticationRequired)
+        }
+    }
+
     // 시속(km/h)에 따라 MET(운동 강도) 값을 결정해 칼로리를 계산.
     // 웹 프론트(js/app.js의 calculateRunStats)와 1:1 대응되는 계산식. 출처: https://pacompendium.com/running/
     static func calculateRunStats(distance: Double, totalMinutes: Double) -> (speedKmh: Double, caloriesBurned: Double) {

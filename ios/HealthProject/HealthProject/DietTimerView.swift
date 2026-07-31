@@ -18,6 +18,7 @@ struct DietTimerView: View {
     @State private var todayErrorMessage: String?
     @State private var actionAlertMessage = ""
     @State private var showActionAlert = false
+    @State private var editingFood: FoodRecord?
 
     @State private var selectedDate = Date()
     @State private var isShowingDayDetail = false
@@ -26,6 +27,20 @@ struct DietTimerView: View {
 
     private var totalCalories: Int {
         todayFoods.reduce(0) { $0 + $1.calorie }
+    }
+
+    // 아침→점심→저녁→간식(Meal.allCases 순서) 기준으로 정렬 — 서버가 등록 순서 그대로 내려주는 것과 무관하게
+    // 화면에서는 항상 끼니 시간 순서로 보이게 함
+    private var sortedTodayFoods: [FoodRecord] {
+        todayFoods.sorted { mealSortIndex(for: $0.meal) < mealSortIndex(for: $1.meal) }
+    }
+
+    private func mealSortIndex(for rawValue: String?) -> Int {
+        guard let rawValue, let meal = Meal(rawValue: rawValue),
+              let index = Meal.allCases.firstIndex(of: meal) else {
+            return Meal.allCases.count
+        }
+        return index
     }
 
     var body: some View {
@@ -74,7 +89,7 @@ struct DietTimerView: View {
                         Text("오늘 먹은 음식이 없습니다.")
                             .foregroundStyle(.secondary)
                     } else {
-                        ForEach(todayFoods) { food in
+                        ForEach(sortedTodayFoods) { food in
                             HStack {
                                 VStack(alignment: .leading, spacing: 2) {
                                     HStack {
@@ -91,6 +106,21 @@ struct DietTimerView: View {
                                 }
                                 Spacer()
                                 Text("\(food.calorie) kcal")
+                            }
+                            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                Button("삭제", role: .destructive) {
+                                    Task { await deleteFood(food) }
+                                }
+                            }
+                            .swipeActions(edge: .leading) {
+                                Button("수정") { editingFood = food }
+                                    .tint(.blue)
+                            }
+                            .contextMenu {
+                                Button("수정") { editingFood = food }
+                                Button("삭제", role: .destructive) {
+                                    Task { await deleteFood(food) }
+                                }
                             }
                         }
                     }
@@ -142,10 +172,18 @@ struct DietTimerView: View {
             .sheet(isPresented: $isShowingDayDetail) {
                 DayDetailView(date: dayDetailDateString())
             }
+            .sheet(item: $editingFood) { food in
+                FoodRecordEditView(food: food, onSaved: {
+                    Task { await loadTodayFoods() }
+                })
+            }
             .alert("확인해주세요", isPresented: $showActionAlert) {
                 Button("확인", role: .cancel) {}
             } message: {
                 Text(actionAlertMessage)
+            }
+            .refreshable {
+                await loadTodayFoods()
             }
             .task {
                 foodPicker.loadFavorites()
@@ -161,6 +199,17 @@ struct DietTimerView: View {
     private func mealLabel(for rawValue: String?) -> String {
         guard let rawValue, let meal = Meal(rawValue: rawValue) else { return "" }
         return meal.label
+    }
+
+    private func deleteFood(_ food: FoodRecord) async {
+        do {
+            try await FoodAPIService.deleteFood(id: food.id)
+            Haptics.success()
+            await loadTodayFoods()
+        } catch {
+            actionAlertMessage = "삭제 실패: \(error.localizedDescription)"
+            showActionAlert = true
+        }
     }
 
     private func loadTodayFoods() async {
