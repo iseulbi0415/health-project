@@ -22,6 +22,11 @@ public record FoodSafetyResponse(Header header, Body body) {
             @JsonProperty("SERVING_SIZE") String servingSize,
             // 품목대표(순수 재료/일반 음식) vs 상용제품(특정 브랜드 가공식품) 구분 — 검색 결과 정렬에만 쓰고
             // 프론트로 내려가는 FoodSearchResult엔 안 들어감 (FoodSearchService.sortByRelevance 참고)
-            @JsonProperty("DB_CLASS_NM") String dbClassNm
+            @JsonProperty("DB_CLASS_NM") String dbClassNm,
+            // 원재료성(생것 등 순수 식재료) vs 음식(조리식품) vs 가공식품(브랜드 제품) 구분.
+            // 실제로 curl로 확인해보니 "사과" 검색 시 원재료성 항목("사과_생것" 등)이 등록순 뒤쪽(때로는
+            // 마지막 페이지)에 몰려있어서, 이 필드로 우선순위를 안 주면 상위 결과에 거의 안 뜸
+            // (FoodSearchService.sortByRelevance 참고)
+            @JsonProperty("DB_GRP_NM") String dbGrpNm
     ) {}
 }

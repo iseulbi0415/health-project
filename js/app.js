@@ -94,10 +94,15 @@ const foodDateTargetBanner = document.getElementById("food-date-target-banner");
 const foodDateTargetCloseBtn = document.getElementById("food-date-target-close-btn");
 const mealButtons = document.querySelectorAll(".meal-btn");
 const mealButtonsRow = document.getElementById("meal-buttons");
+// 끼니 선택/음식 검색/즐겨찾기 목록이 전부 이 카드 하나 안에 같이 있음 — 바깥 클릭 판정 기준으로
+// 카드 전체를 씀(개별 요소를 하나씩 나열하면, 서로가 서로를 "바깥"으로 오인해서 끼니 선택하면
+// 검색결과가 닫히고 검색하면 끼니가 풀리는 문제가 생김)
+const quickAddCard = document.getElementById("quick-add-card");
 
 const foodSearchInput = document.getElementById("food-search-input");
 const foodSearchBtn = document.getElementById("food-search-btn");
 const foodSearchResults = document.getElementById("food-search-results");
+const foodAutoMatchArea = document.getElementById("food-auto-match-area");
 
 const dietCalendarToggleBtn = document.getElementById("diet-calendar-toggle-btn");
 const dietCalendarBox = document.getElementById("diet-calendar-box");
@@ -244,11 +249,11 @@ function closeIfOutside(container, openIndex, setOpenIndex, renderFn, e) {
 }
 
 // 끼니 선택 pill 바깥을 클릭하면 선택 표시 해제 (위 closeIfOutside와 같은 패턴).
-// 단, 즐겨찾기 음식 pill(quickAddList) 클릭은 "바깥"으로 치지 않음 — 그렇게 치면
-// 즐겨찾기로 음식을 추가할 때마다 끼니를 매번 다시 선택해야 해서 연속 추가가 안 됨
+// 단, quickAddCard(끼니 pill+검색+즐겨찾기 목록이 다 같이 있는 카드) 안 클릭은 "바깥"으로
+// 치지 않음 — 그렇게 치면 검색창을 클릭하거나 검색 결과에서 추가하는 동안 끼니 선택이 풀림
 function clearMealIfOutside(e) {
     if (selectedMeal === null) return;
-    if (mealButtonsRow.contains(e.target) || quickAddList.contains(e.target)) return;
+    if (quickAddCard.contains(e.target)) return;
     selectedMeal = null;
     mealButtons.forEach(function (b) {
         b.classList.remove("selected");
@@ -256,12 +261,12 @@ function clearMealIfOutside(e) {
 }
 
 // 검색 결과 바깥을 클릭하면 목록 닫기 (위 clearMealIfOutside와 같은 패턴) — 지금은 따로 닫는
-// 버튼이 없어서 검색만 하면 결과가 계속 화면에 남아있던 문제 대응. 검색창/검색버튼 클릭은
-// "바깥"으로 안 침 — 재검색하는 도중에 결과가 먼저 사라지면 안 되니까
+// 버튼이 없어서 검색만 하면 결과가 계속 화면에 남아있던 문제 대응. 마찬가지로 quickAddCard 안
+// 클릭(끼니 선택 등)은 "바깥"으로 안 침 — 그렇게 치면 끼니를 고르는 순간 검색 결과가 닫혀버림
 function clearFoodSearchResultsIfOutside(e) {
-    if (foodSearchResults.innerHTML === "") return;
-    if (foodSearchResults.contains(e.target) || foodSearchInput.contains(e.target) || foodSearchBtn.contains(e.target)) return;
-    foodSearchResults.innerHTML = "";
+    if (quickAddCard.contains(e.target)) return;
+    if (foodSearchResults.innerHTML !== "") foodSearchResults.innerHTML = "";
+    if (foodAutoMatchArea.innerHTML !== "") foodAutoMatchArea.innerHTML = "";
 }
 
 // --- 식단 관련 함수 ---
@@ -466,6 +471,142 @@ function renderFoodSearchResults(results) {
 
         foodSearchResults.appendChild(row);
     });
+}
+
+// 음식 자동 매칭 — /api/food-search/auto(완전일치면 중앙값, 아니면 AI가 후보 중 선택 + 1인분
+// 그램수까지 추정해서 결과 하나만 내려줌)를 호출. 응답에 5~14초 정도 걸릴 수 있어서 로딩 표시 필수,
+// AI 호출이 중복으로 나가지 않게 요청 중엔 검색 버튼/입력창을 잠가둠
+async function searchFoodAutoApi(keyword) {
+    const trimmed = keyword && keyword.trim();
+    if (!trimmed) return;
+
+    foodSearchBtn.disabled = true;
+    foodSearchInput.disabled = true;
+    renderFoodAutoMatchLoading();
+
+    try {
+        const response = await apiFetch(`${API_BASE}/food-search/auto?keyword=${encodeURIComponent(trimmed)}`, {
+            credentials: "include"
+        });
+
+        if (response.status === 204) {
+            renderFoodAutoMatchEmpty("검색 결과가 없어요", trimmed);
+            return;
+        }
+        if (!response.ok) {
+            renderFoodAutoMatchError();
+            return;
+        }
+
+        const result = await response.json();
+        if (result.estimatedServingCalorie === null || result.estimatedServingCalorie === undefined) {
+            renderFoodAutoMatchEmpty("정확한 영양 정보를 찾지 못했어요", result.name);
+            return;
+        }
+
+        renderFoodAutoMatchResult(result);
+    } catch (e) {
+        // apiFetch가 401이면 이미 handleSessionExpired()로 로그인 게이트를 띄우고 throw한 것 —
+        // 여기서 또 에러 문구를 띄우면 안내가 중복되니 조용히 종료
+        if (!(e && e.message && e.message.indexOf("세션 만료") !== -1)) {
+            renderFoodAutoMatchError();
+        }
+    } finally {
+        foodSearchBtn.disabled = false;
+        foodSearchInput.disabled = false;
+    }
+}
+
+function renderFoodAutoMatchLoading() {
+    foodAutoMatchArea.innerHTML = `
+        <div class="auto-match-loading">
+            <div class="mini-spinner"></div>
+            <span>음식을 자동으로 찾고 있어요... 실제 제품 정보까지 검색하는 중이라 조금만 기다려주세요!</span>
+        </div>
+    `;
+}
+
+function renderFoodAutoMatchError() {
+    foodAutoMatchArea.innerHTML = `<div class="auto-match-empty"><p>검색 중 문제가 생겼어요. 다시 시도해주세요.</p></div>`;
+}
+
+// 검색 결과가 아예 없거나(204), 결과는 있는데 영양정보를 못 찾은 경우(calorie null) 공용으로 쓰는 안내 —
+// 이 폼(#custom-food-form)은 열고 닫는 개념이 없는 상시 카드라 스크롤 이동 + 이름 프리필로만 연결함
+function renderFoodAutoMatchEmpty(message, prefillName) {
+    foodAutoMatchArea.innerHTML = `
+        <div class="auto-match-empty">
+            <p>${message}</p>
+            <button type="button" class="btn-add manual-add-fallback-btn">✏️ 직접 등록하러 가기</button>
+        </div>
+    `;
+
+    foodAutoMatchArea.querySelector(".manual-add-fallback-btn").addEventListener("click", function () {
+        if (prefillName) {
+            document.getElementById("food-name-input").value = prefillName;
+        }
+        document.getElementById("custom-food-form").scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+}
+
+// matchType별 배지 — "exact"는 배지 없음(코드로 확정된 값이라 그대로 신뢰), "ai-selected"는 정보성,
+// "fallback"은 AI 선택까지 실패해서 관련도순 1위로 대체된 값이라 확인을 유도하는 경고 톤
+function autoMatchBadgeHtml(matchType) {
+    if (matchType === "ai-selected") {
+        return `<span class="auto-match-badge badge-info">AI가 비슷한 음식을 찾아줬어요</span>`;
+    }
+    if (matchType === "fallback") {
+        return `<span class="auto-match-badge badge-warn">정확한 값을 찾지 못했어요, 확인해주세요</span>`;
+    }
+    return "";
+}
+
+function renderFoodAutoMatchResult(result) {
+    // matchType이 "fallback"(AI 선택까지 실패해서 관련도순 1위로 대체된 값)이면 즐겨찾기 등록 버튼을
+    // 숨김 — 부정확할 수 있는 값을 영구 저장하는 걸 막기 위함. calorie가 null인 경우는 이 함수 자체가
+    // 안 불리고 renderFoodAutoMatchEmpty가 대신 호출되므로 여기선 따로 안 막아도 됨
+    const showFavoriteBtn = result.matchType !== "fallback";
+
+    foodAutoMatchArea.innerHTML = `
+        <div class="auto-match-card">
+            ${autoMatchBadgeHtml(result.matchType)}
+            <div class="auto-match-name">${result.name}</div>
+            <div class="auto-match-serving">실제 섭취량 약 ${result.estimatedServingGrams}g 기준</div>
+            <div class="auto-match-nutrition">${result.estimatedServingCalorie}kcal · 지방 ${result.estimatedServingFatGrams}g</div>
+            <div class="auto-match-actions">
+                <button type="button" class="btn-add auto-match-add-btn">➕ 오늘 기록에 추가</button>
+                ${showFavoriteBtn ? '<button type="button" class="btn-fav-small auto-match-fav-btn">⭐ 즐겨찾기 등록</button>' : ''}
+            </div>
+        </div>
+    `;
+
+    foodAutoMatchArea.querySelector(".auto-match-add-btn").addEventListener("click", async function () {
+        const digestCategory = fatGramsToDigestCategory(result.estimatedServingFatGrams);
+        await addFoodRecordToToday({
+            이름: result.name,
+            칼로리: result.estimatedServingCalorie,
+            소화시간: digestCategory,
+            트리거: false,
+            지방: result.estimatedServingFatGrams
+        });
+    });
+
+    const favBtn = foodAutoMatchArea.querySelector(".auto-match-fav-btn");
+    if (favBtn) {
+        favBtn.addEventListener("click", function () {
+            // 검색 결과를 즐겨찾기로 등록할 때와 동일한 패턴(renderFoodSearchResults 참고) — 카테고리로
+            // 뭉개지 않고 정확한 지방값(1인분 기준으로 이미 환산된 값)을 그대로 들고 다니게 함
+            const digestCategory = fatGramsToDigestCategory(result.estimatedServingFatGrams);
+            foods.push({
+                이름: result.name,
+                칼로리: result.estimatedServingCalorie,
+                소화시간: digestCategory,
+                트리거: false,
+                지방: result.estimatedServingFatGrams
+            });
+            saveFoods();
+            renderQuickAddList();
+        });
+    }
 }
 
 // 서버에서 "오늘"에 해당하는 음식 목록만 가져오기
@@ -1382,12 +1523,14 @@ digestCancelBtn.addEventListener("click", function () {
 });
 
 // 끼니(아침/점심/저녁/간식) 버튼 클릭 시: 선택 표시 토글 + selectedMeal 값 저장
-// "음식 검색" 버튼 클릭 또는 검색창에서 Enter 입력 시 식약처 API 검색 실행
+// "음식 검색" 버튼 클릭 또는 검색창에서 Enter 입력 시 자동 매칭 실행(/api/food-search/auto).
+// 기존 리스트형 검색(searchFoodApi/renderFoodSearchResults)은 삭제하지 않고 그대로 남겨둠 —
+// 되돌릴 땐 아래 두 줄만 searchFoodApi(foodSearchInput.value)로 바꾸면 됨
 foodSearchBtn.addEventListener("click", function () {
-    searchFoodApi(foodSearchInput.value);
+    searchFoodAutoApi(foodSearchInput.value);
 });
 foodSearchInput.addEventListener("keydown", function (e) {
-    if (e.key === "Enter") searchFoodApi(foodSearchInput.value);
+    if (e.key === "Enter") searchFoodAutoApi(foodSearchInput.value);
 });
 
 // (성별/활동량 버튼과 같은 패턴 — 한 번 선택하면 다른 걸 누르기 전까지 유지)

@@ -471,6 +471,68 @@ body {
 .btn-fav-small { background: rgba(243,156,18,0.15); color: #b9770e; }
 .search-empty { font-size: 13px; color: var(--text-gray); padding: 4px 2px; }
 
+/* 음식 자동 매칭(/api/food-search/auto) 결과 영역 — 로딩/카드/빈 상태를 이 안에서 갈아끼움 */
+.food-auto-match-area:empty { margin: 0; }
+.food-auto-match-area { margin-bottom: 10px; }
+
+.auto-match-loading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--text-gray);
+  padding: 9px 12px;
+}
+.mini-spinner {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  border: 3px solid rgba(58,123,213,0.25);
+  border-top-color: var(--blue);
+  border-radius: 50%;
+  animation: loading-spin 0.8s linear infinite;
+}
+
+.auto-match-card {
+  background: rgba(255,255,255,0.7);
+  border: 1px solid rgba(200,215,230,0.9);
+  border-radius: 10px;
+  padding: 12px 14px;
+}
+.auto-match-name { font-weight: 700; font-size: 15px; margin-bottom: 4px; }
+.auto-match-serving { font-size: 12px; color: var(--text-gray); margin-bottom: 4px; }
+.auto-match-nutrition { font-size: 14px; font-weight: 600; color: var(--orange); margin-bottom: 10px; }
+.auto-match-actions { display: flex; gap: 6px; }
+.auto-match-actions .auto-match-add-btn { flex: 1; }
+.auto-match-actions .auto-match-fav-btn { flex-shrink: 0; }
+
+.auto-match-badge {
+  display: inline-block;
+  border-radius: 99px;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+.auto-match-badge.badge-info {
+  background: rgba(58,123,213,0.13);
+  border: 1px solid rgba(58,123,213,0.28);
+  color: var(--blue);
+}
+.auto-match-badge.badge-warn {
+  background: rgba(224,88,74,0.13);
+  border: 1px solid rgba(224,88,74,0.28);
+  color: #e0584a;
+}
+
+.auto-match-empty {
+  font-size: 13px;
+  color: var(--text-gray);
+  padding: 9px 12px;
+}
+.auto-match-empty p { margin: 0 0 8px; }
+.manual-add-fallback-btn { font-size: 13px; }
+
 .food-list {
   display: flex;
   flex-direction: column;
