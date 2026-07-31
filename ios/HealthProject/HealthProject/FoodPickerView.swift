@@ -40,7 +40,7 @@ struct FoodPickerView: View {
             .navigationTitle("\(date) 음식 추가")
             .searchable(text: $foodPicker.searchQuery, prompt: "음식 이름 검색")
             .onSubmit(of: .search) {
-                Task { await foodPicker.performSearch() }
+                Task { await foodPicker.performAutoMatch() }
             }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {

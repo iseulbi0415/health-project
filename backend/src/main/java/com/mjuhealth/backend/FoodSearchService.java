@@ -32,6 +32,37 @@ public class FoodSearchService {
     private final RestClient restClient = RestClient.create();
 
     public List<FoodSearchResult> search(String keyword) {
+        return fetchSortedCandidates(keyword).stream()
+                .map(this::toResult)
+                .toList();
+    }
+
+    // FoodAutoMatchService(음식 자동 매칭)가 AI 후보 선택 프롬프트에 분류(음식/가공식품/원재료성)도 같이
+    // 넣어야 해서 필요한 조회. FoodSearchResult(웹/iOS로 나가는 응답)엔 분류 필드가 없고(그쪽엔 불필요한
+    // 정보라 의도적으로 뺐음, FoodSafetyResponse.java 주석 참고) 그 계약을 건드리지 않기 위해 별도로 둠
+    public record CandidateWithCategory(FoodSearchResult result, String category) {}
+
+    public List<CandidateWithCategory> searchWithCategory(String keyword) {
+        return fetchSortedCandidates(keyword).stream()
+                .map(item -> new CandidateWithCategory(toResult(item), item.dbGrpNm()))
+                .toList();
+    }
+
+    private List<FoodSafetyResponse.Item> fetchSortedCandidates(String keyword) {
+        List<FoodSafetyResponse.Item> results = fetchSortedCandidatesForLiteralKeyword(keyword);
+        // 식약처 DB에 등록된 이름엔 공백이 거의 없음(예: "까르보불닭맛팝콘") — API가 단순 문자열
+        // 포함검색이라 검색어에 공백이 섞이면("까르보 불닭") 매칭을 아예 못 찾는 경우가 있어서,
+        // 그대로 조회해 0건이면 공백만 지우고 한 번 더 시도함. 원래 결과가 있던 검색어는 여기 안 옴
+        if (results.isEmpty() && keyword != null && keyword.contains(" ")) {
+            String withoutSpaces = keyword.replaceAll("\\s+", "");
+            if (!withoutSpaces.isEmpty()) {
+                results = fetchSortedCandidatesForLiteralKeyword(withoutSpaces);
+            }
+        }
+        return results;
+    }
+
+    private List<FoodSafetyResponse.Item> fetchSortedCandidatesForLiteralKeyword(String keyword) {
         String encodedKeyword = URLEncoder.encode(keyword, StandardCharsets.UTF_8);
 
         try {
@@ -63,7 +94,6 @@ public class FoodSearchService {
 
             return sortByRelevance(items, keyword).stream()
                     .limit(MAX_RESULTS)
-                    .map(this::toResult)
                     .toList();
         } catch (Exception e) {
             // 식약처 API 장애(네트워크 오류, 응답 포맷 변경 등)로 우리 앱 전체가 죽으면 안 되므로

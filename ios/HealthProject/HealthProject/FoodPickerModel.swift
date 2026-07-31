@@ -10,6 +10,21 @@ import Combine
 import Foundation
 import SwiftUI // IndexSet 기반 remove(atOffsets:)가 SwiftUI 확장이라 필요
 
+// /api/food-search/auto(음식 자동 매칭) 진행 상태 — 완전일치/AI선택/실패폴백 결과, 후보 자체가 없는
+// 경우(notFound), 후보는 있는데 영양정보를 못 찾은 경우(noNutritionData)를 각각 구분해서 화면에서
+// 다른 안내를 보여줄 수 있게 함
+enum FoodAutoMatchState {
+    case idle
+    // id를 매번 새로 발급해서 뷰가 .id()로 identity를 강제할 수 있게 함 —
+    // 안 그러면 두 번째 검색부터 ProgressView가 SwiftUI에 의해 재사용되면서
+    // 회전 애니메이션이 다시 시작되지 않는 문제가 있었음
+    case loading(id: UUID)
+    case result(FoodAutoMatchResult)
+    case noNutritionData(name: String)
+    case notFound(keyword: String)
+    case error(String)
+}
+
 final class FoodPickerModel: ObservableObject {
     @Published var favorites: [FavoriteFood] = []
     @Published var searchQuery = ""
@@ -18,6 +33,7 @@ final class FoodPickerModel: ObservableObject {
     @Published var searchErrorMessage: String?
     @Published var alertMessage = ""
     @Published var showAlert = false
+    @Published var autoMatchState: FoodAutoMatchState = .idle
 
     func loadFavorites() {
         guard let data = UserDefaults.standard.data(forKey: "favoriteFoods"),
@@ -96,5 +112,51 @@ final class FoodPickerModel: ObservableObject {
     func addSearchResultToFavorites(_ result: FoodSearchResult) {
         let category = DigestCategory.from(fatGrams: result.fat)
         addNewFavorite(FavoriteFood(name: result.name, calorie: result.calorie ?? 0, digestCategory: category, isTrigger: false, fatGrams: result.fat))
+    }
+
+    func performAutoMatch() async {
+        let keyword = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !keyword.isEmpty else { return }
+
+        autoMatchState = .loading(id: UUID())
+        do {
+            let result = try await FoodAPIService.searchFoodsAuto(keyword: keyword)
+            if let result {
+                autoMatchState = result.estimatedServingCalorie == nil
+                    ? .noNutritionData(name: result.name)
+                    : .result(result)
+            } else {
+                autoMatchState = .notFound(keyword: keyword)
+            }
+        } catch {
+            autoMatchState = .error("검색 실패: \(error.localizedDescription)")
+        }
+    }
+
+    // 1인분으로 이미 환산된 값(estimatedServingCalorie/estimatedServingFatGrams)을 그대로 씀 —
+    // 100g 기준값을 쓰면 예전 "1인분 기준" 오표시 문제가 재발하기 때문
+    func addAutoMatchToRecord(_ result: FoodAutoMatchResult, meal: Meal, recordedAt: String?) async {
+        guard let calorie = result.estimatedServingCalorie else { return }
+        let category = DigestCategory.from(fatGrams: result.estimatedServingFatGrams)
+        do {
+            _ = try await FoodAPIService.createFood(
+                name: result.name,
+                calorie: calorie,
+                digestTime: String(category.rawValue),
+                isTrigger: false,
+                meal: meal,
+                fatGrams: result.estimatedServingFatGrams,
+                recordedAt: recordedAt
+            )
+        } catch {
+            alertMessage = "추가 실패: \(error.localizedDescription)"
+            showAlert = true
+        }
+    }
+
+    func addAutoMatchToFavorites(_ result: FoodAutoMatchResult) {
+        guard let calorie = result.estimatedServingCalorie else { return }
+        let category = DigestCategory.from(fatGrams: result.estimatedServingFatGrams)
+        addNewFavorite(FavoriteFood(name: result.name, calorie: calorie, digestCategory: category, isTrigger: false, fatGrams: result.estimatedServingFatGrams))
     }
 }

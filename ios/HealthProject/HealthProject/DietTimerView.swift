@@ -123,7 +123,7 @@ struct DietTimerView: View {
             .navigationTitle("식단·타이머")
             .searchable(text: $foodPicker.searchQuery, prompt: "음식 이름 검색")
             .onSubmit(of: .search) {
-                Task { await foodPicker.performSearch() }
+                Task { await foodPicker.performAutoMatch() }
             }
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {

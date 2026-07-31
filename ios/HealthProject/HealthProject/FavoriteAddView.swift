@@ -12,12 +12,19 @@ struct FavoriteAddView: View {
 
     @Environment(\.dismiss) private var dismiss
 
-    @State private var name = ""
+    @State private var name: String
     @State private var calorieText = ""
     @State private var digestCategory = DigestCategory.normal
     @State private var isTrigger = false
     @State private var showAlert = false
     @State private var alertMessage = ""
+
+    // 자동 매칭이 정확한 영양정보를 못 찾았을 때, 검색했던 이름을 그대로 채워서 이 폼으로 연결하기 위한
+    // 프리필 파라미터 — 기존 호출부(DietTimerView)는 그대로 인자 없이 호출 가능(기본값 "")
+    init(initialName: String = "", onSave: @escaping (FavoriteFood) -> Void) {
+        self._name = State(initialValue: initialName)
+        self.onSave = onSave
+    }
 
     var body: some View {
         NavigationStack {

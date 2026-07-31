@@ -96,4 +96,30 @@ enum FoodAPIService {
 
         return try JSONDecoder().decode([FoodSearchResult].self, from: data)
     }
+
+    // 완전일치면 칼로리 중앙값으로, 아니면 AI가 후보 중 선택 + 1인분 그램수까지 추정해서 결과 하나만
+    // 내려주는 자동 매칭. 204는 후보 자체가 없다는 뜻이라 nil로 구분함(200인데 영양정보만 못 찾은
+    // 경우는 nil이 아니라 estimatedServingCalorie가 nil인 결과로 내려옴 — 호출부에서 구분해서 처리)
+    static func searchFoodsAuto(keyword: String) async throws -> FoodAutoMatchResult? {
+        let encodedKeyword = keyword.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? keyword
+        guard let url = URL(string: "\(baseURL)/api/food-search/auto?keyword=\(encodedKeyword)") else {
+            throw URLError(.badURL)
+        }
+
+        let (data, response) = try await URLSession.shared.data(from: url)
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw URLError(.badServerResponse)
+        }
+        if httpResponse.statusCode == 204 {
+            return nil
+        }
+        guard (200...299).contains(httpResponse.statusCode) else {
+            if httpResponse.statusCode == 401 {
+                AuthManager.shared.logout()
+            }
+            throw URLError(.userAuthenticationRequired)
+        }
+
+        return try JSONDecoder().decode(FoodAutoMatchResult.self, from: data)
+    }
 }
