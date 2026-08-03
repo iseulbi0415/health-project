@@ -14,6 +14,9 @@ struct ContentView: View {
     @State private var errorMessage: String? = nil  // 요청 실패 시 보여줄 에러 메시지
     @State private var isShowingAddSheet = false     // 러닝 기록 추가 화면(시트) 표시 여부
     @State private var editingRun: RunRecord?         // 스와이프/컨텍스트 메뉴 "수정"에서 열리는 편집 시트 대상
+    // 탭 재방문마다 .task가 다시 실행돼 재조회가 일어나는데, 최초 로딩이 아니면 스피너로
+    // 기존 목록을 가리지 않고 조용히 백그라운드에서 갱신하기 위한 플래그
+    @State private var hasLoadedOnce = false
 
     var body: some View {
         // NavigationStack: 화면 위쪽에 타이틀("러닝 기록")이 붙은 내비게이션 바를 만들어줌
@@ -137,13 +140,14 @@ struct ContentView: View {
 
     // 실제로 API를 호출하고, 결과(또는 에러)를 @State 변수에 담아 화면을 갱신하는 함수
     private func loadRuns() async {
-        isLoading = true
+        if !hasLoadedOnce { isLoading = true }
         errorMessage = nil
         do {
             runs = try await RunAPIService.fetchRuns()
         } catch {
             errorMessage = "불러오기 실패: \(error.localizedDescription)\n(로그인이 만료됐을 수 있습니다 — 앱을 삭제 후 다시 실행해 재로그인해주세요. 로그아웃 기능은 아직 없습니다)"
         }
+        hasLoadedOnce = true
         isLoading = false
     }
 }

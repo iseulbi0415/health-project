@@ -25,6 +25,9 @@ struct ProfileView: View {
     @State private var recentMemos: [MemoRecord] = []
     @State private var isLoadingMemos = false
     @State private var memosErrorMessage: String?
+    // 탭 재방문마다 .task가 다시 실행돼 재조회가 일어나는데, 최초 로딩이 아니면 스피너로
+    // 기존 목록을 가리지 않고 조용히 백그라운드에서 갱신하기 위한 플래그
+    @State private var hasLoadedOnce = false
     @State private var editingMemo: MemoRecord?
     @State private var isShowingAddMemoSheet = false
     // 평소엔 목록 항목 없이 "N개 보기"만, 펼치면 5개 다 — DisclosureGroup 표준 화살표 재사용
@@ -93,13 +96,15 @@ struct ProfileView: View {
                     if let bmrSummary {
                         // 최근 컨디션이 접히면서 생긴 여백을 이 카드가 채움 — "요약"이 아니라 화면의
                         // 메인 콘텐츠로 취급. 목표/유지/BMR 세 숫자는 "증량이 무조건 목표"라는 인상을
-                        // 주지 않기 위해 동등한 크기로 나란히 배치 — 폰트는 HomeView "오늘 칼로리"
-                        // 숫자(.title2.bold())와 통일해서 앱 전체 칼로리 표기 일관성 유지
+                        // 주지 않기 위해 동등한 크기로 취급 — 가로 3분할은 좁은 칸 때문에 폰트가
+                        // 자동 축소돼서(minimumScaleFactor) 홈 화면 숫자와 실제 크기가 달라지는
+                        // 문제가 있었음 → 세로로 한 줄씩 쌓아서 공간을 넉넉히 주고, 축소 없이
+                        // .title2.bold() 그대로(홈 화면 "오늘 칼로리"와 완전히 동일한 크기) 유지
                         VStack(alignment: .leading, spacing: 18) {
-                            HStack(alignment: .top, spacing: 12) {
-                                calorieStat(label: "목표 칼로리", value: bmrSummary.bulk)
-                                calorieStat(label: "유지 칼로리", value: bmrSummary.tdee)
-                                calorieStat(label: "BMR", value: bmrSummary.bmr)
+                            VStack(alignment: .leading, spacing: 10) {
+                                calorieRow(label: "목표 칼로리", value: bmrSummary.bulk)
+                                calorieRow(label: "유지 칼로리", value: bmrSummary.tdee)
+                                calorieRow(label: "BMR", value: bmrSummary.bmr)
                             }
 
                             Divider()
@@ -197,22 +202,20 @@ struct ProfileView: View {
             }
     }
 
-    // 목표/유지/BMR 세 숫자를 동일한 크기로 나란히 배치하기 위한 공용 뷰 — 폰트는 HomeView
-    // "오늘 칼로리" 숫자와 동일하게 .title2.bold()로 통일
+    // 목표/유지/BMR을 한 줄씩(라벨+숫자) 세로로 쌓기 위한 공용 뷰 — 세로 배치라 폭이 넉넉해서
+    // 축소(minimumScaleFactor) 없이 HomeView "오늘 칼로리"와 완전히 동일한 .title2.bold()로 표시
     @ViewBuilder
-    private func calorieStat(label: String, value: Int) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
+    private func calorieRow(label: String, value: Int) -> some View {
+        HStack(spacing: 8) {
             Text(label)
                 .font(.caption)
                 .foregroundStyle(.secondary)
+                .frame(width: 76, alignment: .leading)
             Text("\(value) kcal")
                 .font(.title2)
                 .bold()
                 .monospacedDigit()
-                .lineLimit(1)
-                .minimumScaleFactor(0.75)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     // BMR 카드 하단 입력값(키/몸무게/나이/성별/활동량)을 캡슐 태그로 보여줌 — 한 줄에 억지로
@@ -300,7 +303,7 @@ struct ProfileView: View {
     }
 
     private func loadRecentMemos() async {
-        isLoadingMemos = true
+        if !hasLoadedOnce { isLoadingMemos = true }
         memosErrorMessage = nil
         do {
             let all = try await MemoAPIService.fetchMemos()
@@ -314,6 +317,7 @@ struct ProfileView: View {
         } catch {
             memosErrorMessage = "최근 기록을 불러오지 못했습니다."
         }
+        hasLoadedOnce = true
         isLoadingMemos = false
     }
 }

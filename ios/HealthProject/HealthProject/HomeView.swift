@@ -21,6 +21,9 @@ struct HomeView: View {
     @State private var recentRun: RunRecord?
     @State private var isLoading = false
     @State private var errorMessage: String?
+    // 탭을 벗어났다 돌아올 때마다 .task가 다시 실행돼 재조회가 일어나는데, 최초 로딩이 아니면
+    // 스피너로 기존 데이터를 가리지 않고 조용히 백그라운드에서 갱신하기 위한 플래그
+    @State private var hasLoadedOnce = false
 
     private var totalCalories: Int {
         todayFoods.reduce(0) { $0 + $1.calorie }
@@ -143,7 +146,7 @@ struct HomeView: View {
     }
 
     private func loadHomeData() async {
-        isLoading = true
+        if !hasLoadedOnce { isLoading = true }
         errorMessage = nil
         async let foodsResult = FoodAPIService.fetchTodayFoods(date: todayDateString())
         async let runsResult = RunAPIService.fetchRuns()
@@ -157,6 +160,7 @@ struct HomeView: View {
         } catch {
             errorMessage = "불러오기 실패: \(error.localizedDescription)"
         }
+        hasLoadedOnce = true
         isLoading = false
     }
 
