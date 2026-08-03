@@ -44,8 +44,19 @@ struct MemoEditView: View {
                 }
 
                 Section("컨디션 메모") {
-                    TextEditor(text: $content)
-                        .frame(minHeight: 100)
+                    // TextEditor는 TextField와 달리 placeholder가 없어서, 내용이 비어있을 때만
+                    // 안내 문구를 겹쳐 보여주고 타이핑을 시작하면 사라지게 함(ZStack 트릭)
+                    ZStack(alignment: .topLeading) {
+                        if content.isEmpty {
+                            Text("오늘 컨디션이나 증상을 자유롭게 적어보세요")
+                                .foregroundStyle(.secondary)
+                                .padding(.top, 8)
+                                .padding(.leading, 5)
+                                .allowsHitTesting(false)
+                        }
+                        TextEditor(text: $content)
+                            .frame(minHeight: 100)
+                    }
 
                     VStack(alignment: .leading) {
                         Text("증상 점수: \(Int(symptomScore))")

@@ -52,9 +52,14 @@ struct FavoriteAddView: View {
                 }
 
                 Section {
+                    // 트리거/경고 계열 색은 CalorieCoral로 통일(다른 화면의 "⚠️ 트리거" 배지와 동일) —
+                    // 기본 accentColor(파란색)를 그대로 두면 색상 원칙과 어긋남. 토글 스위치뿐 아니라
+                    // 라벨 아이콘도 기본 상태에서 파란색으로 렌더링되고 있어서 같이 맞춤
                     Toggle(isOn: $isTrigger) {
                         Label("트리거 음식(역류 유발 가능)", systemImage: "exclamationmark.triangle.fill")
+                            .foregroundStyle(Color("CalorieCoral"))
                     }
+                    .tint(Color("CalorieCoral"))
                 }
             }
             .navigationTitle(existingFavorite == nil ? "즐겨찾기 등록" : "즐겨찾기 수정")
