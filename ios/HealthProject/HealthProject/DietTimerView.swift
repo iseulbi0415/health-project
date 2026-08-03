@@ -19,6 +19,7 @@ struct DietTimerView: View {
     @State private var actionAlertMessage = ""
     @State private var showActionAlert = false
     @State private var editingFood: FoodRecord?
+    @State private var isShowingSearchSheet = false
 
     @State private var selectedDate = Date()
     @State private var isShowingDayDetail = false
@@ -45,7 +46,44 @@ struct DietTimerView: View {
 
     var body: some View {
         NavigationStack {
-            List {
+            // GradientHeaderView는 List 밖(VStack의 형제)에 둬서 리스트 행/섹션 카드 스타일과
+            // 무관하게 화면 최상단에 전체 폭 배너로 붙게 함(HomeView와 동일한 이유)
+            VStack(spacing: 0) {
+                GradientHeaderView(
+                    title: "식단·타이머",
+                    subtitle: "오늘 먹은 것을 기록하고 타이머를 시작하세요",
+                    colors: HeaderPalette.green
+                ) {
+                    HeaderActionCapsule {
+                        Button {
+                            isShowingAddFavoriteSheet = true
+                        } label: {
+                            Image(systemName: "plus")
+                                .imageScale(.large)
+                                .frame(width: 28, height: 28)
+                                .contentShape(Rectangle())
+                        }
+                        Button {
+                            isShowingSearchSheet = true
+                        } label: {
+                            Image(systemName: "magnifyingglass")
+                                .imageScale(.large)
+                                .frame(width: 28, height: 28)
+                                .contentShape(Rectangle())
+                        }
+                    }
+                }
+
+                dietTimerList
+            }
+            .navigationTitle("")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(.hidden, for: .navigationBar)
+        }
+    }
+
+    private var dietTimerList: some View {
+        List {
                 Section("날짜별 기록 조회") {
                     Button(isShowingCalendar ? "달력 닫기" : "달력 열기") {
                         withAnimation { isShowingCalendar.toggle() }
@@ -95,9 +133,9 @@ struct DietTimerView: View {
                                     HStack {
                                         Text(food.quantity > 1 ? "\(food.name) ×\(food.quantity)" : food.name)
                                         if food.isTrigger {
-                                            Text("⚠️ 트리거")
+                                            Label("트리거", systemImage: "exclamationmark.triangle.fill")
                                                 .font(.caption)
-                                                .foregroundStyle(.orange)
+                                                .foregroundStyle(Color("CalorieCoral"))
                                         }
                                     }
                                     Text(mealLabel(for: food.meal))
@@ -106,6 +144,7 @@ struct DietTimerView: View {
                                 }
                                 Spacer()
                                 Text("\(food.calorie) kcal")
+                                    .monospacedDigit()
                             }
                             .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                                 Button("삭제", role: .destructive) {
@@ -126,47 +165,35 @@ struct DietTimerView: View {
                     }
                     Text("오늘 총 섭취: \(totalCalories) kcal")
                         .font(.headline)
+                        .monospacedDigit()
                 }
 
                 Section("소화 타이머") {
                     Button("식사 완료 → 타이머 시작", action: completeMeal)
+                        .buttonStyle(.borderedProminent)
+                        .tint(.accentColor)
+
+                    DigestionWaveContainerView(style: .hero)
+                        .listRowInsets(EdgeInsets())
 
                     if digestionTimerManager.endTime != nil {
-                        TimelineView(.periodic(from: .now, by: 1)) { context in
-                            VStack(alignment: .leading, spacing: 8) {
-                                Text(digestionTimerManager.countdownText(at: context.date))
-                                    .font(.title2)
-                                    .bold()
-                                ProgressView(value: digestionTimerManager.progress(at: context.date))
-                                Text(digestionTimerManager.endTimeText)
-                                    .font(.footnote)
-                                    .foregroundStyle(.secondary)
-                                Text(digestionTimerManager.warningText(at: context.date))
-                                Button("타이머 취소", role: .destructive) {
-                                    digestionTimerManager.cancel()
-                                }
-                            }
+                        Button("타이머 취소", role: .destructive) {
+                            digestionTimerManager.cancel()
                         }
                     }
                 }
             }
-            .navigationTitle("식단·타이머")
-            .searchable(text: $foodPicker.searchQuery, prompt: "음식 이름 검색")
-            .onSubmit(of: .search) {
-                Task { await foodPicker.performAutoMatch() }
-            }
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button {
-                        isShowingAddFavoriteSheet = true
-                    } label: {
-                        Image(systemName: "plus")
-                    }
-                }
-            }
+            .listStyle(.insetGrouped)
             .sheet(isPresented: $isShowingAddFavoriteSheet) {
                 FavoriteAddView(onSave: { favorite in
                     foodPicker.addNewFavorite(favorite)
+                })
+            }
+            // 검색 전용 시트 — 평소 화면엔 검색창을 안 두고, 돋보기 버튼을 눌렀을 때만
+            // iOS 표준 검색 UI(취소 버튼 포함)가 여기 안에서 뜨게 함
+            .sheet(isPresented: $isShowingSearchSheet) {
+                FoodSearchSheetView(model: foodPicker, selectedMeal: selectedMeal, onAdded: {
+                    await loadTodayFoods()
                 })
             }
             .sheet(isPresented: $isShowingDayDetail) {
@@ -193,7 +220,6 @@ struct DietTimerView: View {
                     await loadMonthSummary(year: year, month: month)
                 }
             }
-        }
     }
 
     private func mealLabel(for rawValue: String?) -> String {

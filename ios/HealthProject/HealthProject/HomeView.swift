@@ -38,25 +38,34 @@ struct HomeView: View {
 
     var body: some View {
         NavigationStack {
-            List {
+            // GradientHeaderView는 List 밖(VStack의 형제)에 둬서 리스트 행/섹션 카드 스타일과
+            // 무관하게 화면 최상단에 전체 폭 배너로 붙게 함 — List 안에 넣으면 .insetGrouped가
+            // 둥근 카드 배경을 강제로 씌워서 "배너"가 아니라 "카드 하나"처럼 보이는 문제가 있었음
+            VStack(spacing: 0) {
+                GradientHeaderView(
+                    title: "안녕하세요 🌿 오늘도 안심하게",
+                    subtitle: todayDateDisplay() + " · 역류성 식도염 케어 & 러닝 관리",
+                    colors: HeaderPalette.blue
+                ) {
+                    EmptyView()
+                }
+
+                homeList
+            }
+            // 시스템 nav bar 제목 텍스트를 완전히 숨김 — 화면 이름은 GradientHeaderView 안에만 존재.
+            // 빈 문자열 + inline이라 nav bar 자체(칸)는 남지만 텍스트가 없고, 배경도 숨겨서
+            // 배너 그라데이션이 상태바 뒤까지 자연스럽게 이어지게 함
+            .navigationTitle("")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(.hidden, for: .navigationBar)
+        }
+    }
+
+    private var homeList: some View {
+        List {
                 Section("소화 타이머") {
-                    if digestionTimerManager.endTime != nil {
-                        TimelineView(.periodic(from: .now, by: 1)) { context in
-                            VStack(alignment: .leading, spacing: 8) {
-                                Text(digestionTimerManager.countdownText(at: context.date))
-                                    .font(.title2)
-                                    .bold()
-                                ProgressView(value: digestionTimerManager.progress(at: context.date))
-                                Text(digestionTimerManager.endTimeText)
-                                    .font(.footnote)
-                                    .foregroundStyle(.secondary)
-                                Text(digestionTimerManager.warningText(at: context.date))
-                            }
-                        }
-                    } else {
-                        Text("소화 중인 기록 없음")
-                            .foregroundStyle(.secondary)
-                    }
+                    DigestionWaveContainerView(style: .compact)
+                        .listRowInsets(EdgeInsets())
                 }
 
                 Section("오늘 칼로리") {
@@ -67,21 +76,35 @@ struct HomeView: View {
                             .foregroundStyle(.red)
                             .font(.footnote)
                     } else if let goalCalories {
-                        Text("\(totalCalories) / \(Int(goalCalories.rounded())) kcal")
-                            .font(.title2)
-                            .bold()
+                        HStack(spacing: 6) {
+                            Image(systemName: "flame.fill")
+                                .font(.footnote)
+                                .foregroundStyle(Color("CalorieCoral"))
+                            Text("\(totalCalories) / \(Int(goalCalories.rounded())) kcal")
+                                .font(.title2)
+                                .bold()
+                                .monospacedDigit()
+                        }
                         ProgressView(value: min(Double(totalCalories) / goalCalories, 1.0))
+                            .tint(Color("CalorieCoral"))
+                            .frame(height: 12)
                     } else {
-                        Text("\(totalCalories) kcal")
-                            .font(.title2)
-                            .bold()
+                        HStack(spacing: 6) {
+                            Image(systemName: "flame.fill")
+                                .font(.footnote)
+                                .foregroundStyle(Color("CalorieCoral"))
+                            Text("\(totalCalories) kcal")
+                                .font(.title2)
+                                .bold()
+                                .monospacedDigit()
+                        }
                         Text("내 정보를 입력하면 목표 대비 칼로리를 확인할 수 있어요")
                             .font(.footnote)
                             .foregroundStyle(.secondary)
                     }
                 }
 
-                Section("최근 러닝") {
+                Section {
                     if isLoading {
                         ProgressView()
                     } else if let errorMessage {
@@ -92,28 +115,31 @@ struct HomeView: View {
                         VStack(alignment: .leading, spacing: 4) {
                             Text("\(recentRun.distance, specifier: "%.2f") km")
                                 .font(.headline)
+                                .monospacedDigit()
                             HStack {
                                 Text("시간 \(recentRun.timeDisplay)")
                                 Spacer()
                                 Text("페이스 \(recentRun.paceDisplay)")
                             }
                             .font(.subheadline)
+                            .monospacedDigit()
                             .foregroundStyle(.secondary)
                         }
                     } else {
                         Text("아직 기록 없음")
                             .foregroundStyle(.secondary)
                     }
+                } header: {
+                    Label("최근 러닝", systemImage: "figure.run")
                 }
             }
-            .navigationTitle("홈")
+            .listStyle(.insetGrouped)
             .refreshable {
                 await loadHomeData()
             }
             .task {
                 await loadHomeData()
             }
-        }
     }
 
     private func loadHomeData() async {
@@ -137,6 +163,14 @@ struct HomeView: View {
     private func todayDateString() -> String {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd"
+        return formatter.string(from: Date())
+    }
+
+    // 헤더 인사말 아래 보조 텍스트용 — "2026.08.01 토요일" 형식
+    private func todayDateDisplay() -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy.MM.dd EEEE"
+        formatter.locale = Locale(identifier: "ko_KR")
         return formatter.string(from: Date())
     }
 }

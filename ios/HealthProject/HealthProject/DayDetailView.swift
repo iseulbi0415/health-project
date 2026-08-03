@@ -10,6 +10,17 @@ import SwiftUI
 struct DayDetailView: View {
     let date: String   // "yyyy-MM-dd"
 
+    // 타이틀에 요일을 작게 덧붙임 — "2026-07-21 (화)"
+    private var dateWithWeekday: String {
+        let parser = DateFormatter()
+        parser.dateFormat = "yyyy-MM-dd"
+        guard let parsed = parser.date(from: date) else { return date }
+        let weekdayFormatter = DateFormatter()
+        weekdayFormatter.dateFormat = "E"
+        weekdayFormatter.locale = Locale(identifier: "ko_KR")
+        return "\(date) (\(weekdayFormatter.string(from: parsed)))"
+    }
+
     @State private var foods: [FoodRecord] = []
     @State private var runs: [RunRecord] = []
     @State private var memos: [MemoRecord] = []
@@ -94,7 +105,7 @@ struct DayDetailView: View {
                     .disabled(isSavingMemo)
                 }
             }
-            .navigationTitle(date)
+            .navigationTitle(dateWithWeekday)
             .overlay {
                 if isLoading {
                     ProgressView()

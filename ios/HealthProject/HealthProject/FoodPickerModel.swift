@@ -35,6 +35,17 @@ final class FoodPickerModel: ObservableObject {
     @Published var showAlert = false
     @Published var autoMatchState: FoodAutoMatchState = .idle
 
+    // 검색 시트는 상태를 자체 소유하지 않고 이 모델(DietTimerView가 들고 있는 공유 인스턴스)을
+    // 그대로 참조하므로, 시트를 닫아도 검색어/결과가 자동으로 사라지지 않음 — 시트가 열릴 때마다
+    // 호출해서 매번 빈 상태로 시작하게 함
+    func resetSearch() {
+        searchQuery = ""
+        autoMatchState = .idle
+        searchResults = []
+        isSearchingFoods = false
+        searchErrorMessage = nil
+    }
+
     func loadFavorites() {
         guard let data = UserDefaults.standard.data(forKey: "favoriteFoods"),
               let decoded = try? JSONDecoder().decode([FavoriteFood].self, from: data) else { return }
@@ -85,7 +96,9 @@ final class FoodPickerModel: ObservableObject {
     }
 
     // recordedAt이 nil이면 서버가 현재시각으로 채움(오늘 기록), 특정 날짜+시각 문자열이면 그 날짜로 저장됨
-    func addFavoriteToRecord(_ favorite: FavoriteFood, meal: Meal, recordedAt: String?) async {
+    // 반환값은 버튼 쪽 체크마크/햅틱 피드백을 성공했을 때만 재생하기 위한 성공 여부
+    @discardableResult
+    func addFavoriteToRecord(_ favorite: FavoriteFood, meal: Meal, recordedAt: String?) async -> Bool {
         do {
             _ = try await FoodAPIService.createFood(
                 name: favorite.name,
@@ -96,9 +109,11 @@ final class FoodPickerModel: ObservableObject {
                 fatGrams: favorite.fatGrams,
                 recordedAt: recordedAt
             )
+            return true
         } catch {
             alertMessage = "추가 실패: \(error.localizedDescription)"
             showAlert = true
+            return false
         }
     }
 
@@ -149,8 +164,10 @@ final class FoodPickerModel: ObservableObject {
 
     // 1인분으로 이미 환산된 값(estimatedServingCalorie/estimatedServingFatGrams)을 그대로 씀 —
     // 100g 기준값을 쓰면 예전 "1인분 기준" 오표시 문제가 재발하기 때문
-    func addAutoMatchToRecord(_ result: FoodAutoMatchResult, meal: Meal, recordedAt: String?) async {
-        guard let calorie = result.estimatedServingCalorie else { return }
+    // 반환값은 버튼 쪽 체크마크/햅틱 피드백을 성공했을 때만 재생하기 위한 성공 여부
+    @discardableResult
+    func addAutoMatchToRecord(_ result: FoodAutoMatchResult, meal: Meal, recordedAt: String?) async -> Bool {
+        guard let calorie = result.estimatedServingCalorie else { return false }
         let category = DigestCategory.from(fatGrams: result.estimatedServingFatGrams)
         do {
             _ = try await FoodAPIService.createFood(
@@ -162,9 +179,11 @@ final class FoodPickerModel: ObservableObject {
                 fatGrams: result.estimatedServingFatGrams,
                 recordedAt: recordedAt
             )
+            return true
         } catch {
             alertMessage = "추가 실패: \(error.localizedDescription)"
             showAlert = true
+            return false
         }
     }
 

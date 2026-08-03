@@ -38,7 +38,9 @@ struct FoodPickerView: View {
                 })
             }
             .navigationTitle("\(date) 음식 추가")
-            .searchable(text: $foodPicker.searchQuery, prompt: "음식 이름 검색")
+            // placement 없으면(.automatic) 검색창이 화면 하단 쪽에 배치돼서, nav bar 바로 아래
+            // 항상 고정되도록 명시(FoodSearchSheetView와 동일한 이유)
+            .searchable(text: $foodPicker.searchQuery, placement: .navigationBarDrawer(displayMode: .always), prompt: "음식 이름 검색")
             .onSubmit(of: .search) {
                 Task { await foodPicker.performAutoMatch() }
             }

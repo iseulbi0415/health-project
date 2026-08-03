@@ -50,6 +50,9 @@ struct LoginView: View {
             do {
                 let accessToken = try await requestKakaoAccessToken()
                 try await RunAPIService.loginWithKakao(accessToken: accessToken)
+                // 앱을 삭제했다 재설치한 경우 로컬 캐시(@AppStorage)가 비어있으므로, 로그인 성공
+                // 직후 서버에 저장된 "내 정보"로 복원함 — 실패해도 로그인 자체는 막지 않음
+                await UserProfileAPIService.hydrateLocalCache()
                 isLoggingIn = false
                 authManager.login()
             } catch {

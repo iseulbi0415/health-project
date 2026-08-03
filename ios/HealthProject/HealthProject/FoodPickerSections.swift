@@ -13,6 +13,9 @@ struct FoodPickerSections: View {
     let selectedMeal: Meal
     let recordedAt: String?
     let onAdded: () async -> Void
+    // 검색 시트에서는 "빠르게 추가하기"로 다르게 부르고 싶어서 파라미터화 — 기존 호출부(DietTimerView/
+    // FoodPickerView)는 인자 없이 그대로 컴파일되도록 기본값을 "즐겨찾기"로 둠
+    var favoritesSectionTitle: String = "즐겨찾기"
 
     @Environment(\.isSearching) private var isSearchActive
 
@@ -28,6 +31,11 @@ struct FoodPickerSections: View {
     @State private var fallbackTarget: FallbackPrefillTarget?
     // 즐겨찾기 스와이프/컨텍스트 메뉴 "수정"에서 열리는 편집 시트 대상
     @State private var editingFavorite: FavoriteFood?
+    // 추가 버튼 탭 시 잠깐 체크마크로 바뀌는 마이크로 인터랙션용 — 토스트/화면전환 없이도
+    // "확실히 추가됐다"는 느낌을 주기 위함. 즐겨찾기는 여러 행 중 방금 누른 행만 표시해야 해서 id로,
+    // 검색결과 카드는 한 번에 하나뿐이라 Bool로 충분
+    @State private var justAddedFavoriteID: FavoriteFood.ID?
+    @State private var justAddedAutoMatch = false
 
     private var addButtonLabel: String {
         recordedAt == nil ? "오늘 먹었어요" : "이 날짜로 추가"
@@ -41,7 +49,7 @@ struct FoodPickerSections: View {
                 }
             }
 
-            Section("즐겨찾기") {
+            Section(favoritesSectionTitle) {
                 if model.favorites.isEmpty {
                     Text("등록된 즐겨찾기가 없습니다.")
                         .foregroundStyle(.secondary)
@@ -52,23 +60,46 @@ struct FoodPickerSections: View {
                             HStack {
                                 Text(favorite.name)
                                 if favorite.isTrigger {
-                                    Text("⚠️ 트리거")
+                                    Label("트리거", systemImage: "exclamationmark.triangle.fill")
                                         .font(.caption)
-                                        .foregroundStyle(.orange)
+                                        .foregroundStyle(Color("CalorieCoral"))
                                 }
                             }
                             Text("\(favorite.calorie) kcal · \(favorite.digestCategory.label)")
                                 .font(.footnote)
+                                .monospacedDigit()
                                 .foregroundStyle(.secondary)
                         }
                         Spacer()
-                        Button(addButtonLabel) {
+                        Button {
                             Task {
-                                await model.addFavoriteToRecord(favorite, meal: selectedMeal, recordedAt: recordedAt)
+                                let success = await model.addFavoriteToRecord(favorite, meal: selectedMeal, recordedAt: recordedAt)
                                 await onAdded()
+                                guard success else { return }
+                                Haptics.success()
+                                withAnimation(.spring(response: 0.25, dampingFraction: 0.55)) {
+                                    justAddedFavoriteID = favorite.id
+                                }
+                                try? await Task.sleep(nanoseconds: 580_000_000)
+                                guard justAddedFavoriteID == favorite.id else { return }
+                                withAnimation(.easeInOut(duration: 0.3)) {
+                                    justAddedFavoriteID = nil
+                                }
                             }
+                        } label: {
+                            Group {
+                                if justAddedFavoriteID == favorite.id {
+                                    Image(systemName: "checkmark")
+                                        .scaleEffect(1.15)
+                                        .transition(.opacity.combined(with: .scale))
+                                } else {
+                                    Text(addButtonLabel)
+                                        .transition(.opacity.combined(with: .scale))
+                                }
+                            }
+                            .frame(minWidth: 70)
                         }
-                        .buttonStyle(.bordered)
+                        .buttonStyle(.glass)
                     }
                     // allowsFullSwipe: true — 끝까지 밀면 확인 없이 바로 삭제(메일 앱과 동일한 iOS 표준 동작)
                     .swipeActions(edge: .trailing, allowsFullSwipe: true) {
@@ -139,21 +170,45 @@ struct FoodPickerSections: View {
             if let grams = result.estimatedServingGrams {
                 Text("실제 섭취량 약 \(grams)g 기준")
                     .font(.footnote)
+                    .monospacedDigit()
                     .foregroundStyle(.secondary)
             }
             if let calorie = result.estimatedServingCalorie, let fat = result.estimatedServingFatGrams {
                 Text("\(calorie)kcal · 지방 \(fat, specifier: "%.1f")g")
                     .font(.subheadline)
+                    .monospacedDigit()
                     .fontWeight(.semibold)
             }
             HStack {
-                Button("오늘 기록에 추가") {
+                Button {
                     Task {
-                        await model.addAutoMatchToRecord(result, meal: selectedMeal, recordedAt: recordedAt)
+                        let success = await model.addAutoMatchToRecord(result, meal: selectedMeal, recordedAt: recordedAt)
                         await onAdded()
+                        guard success else { return }
+                        Haptics.success()
+                        withAnimation(.spring(response: 0.25, dampingFraction: 0.55)) {
+                            justAddedAutoMatch = true
+                        }
+                        try? await Task.sleep(nanoseconds: 580_000_000)
+                        withAnimation(.easeInOut(duration: 0.3)) {
+                            justAddedAutoMatch = false
+                        }
                     }
+                } label: {
+                    Group {
+                        if justAddedAutoMatch {
+                            Image(systemName: "checkmark")
+                                .scaleEffect(1.15)
+                                .transition(.opacity.combined(with: .scale))
+                        } else {
+                            Text("오늘 기록에 추가")
+                                .transition(.opacity.combined(with: .scale))
+                        }
+                    }
+                    .frame(minWidth: 90)
                 }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(.glassProminent)
+                .tint(.accentColor)
 
                 // fallback(AI 선택까지 실패해서 관련도순 1위로 대체된 값)이면 부정확한 값을 영구
                 // 저장하는 걸 막기 위해 즐겨찾기 등록 버튼을 숨김
@@ -161,7 +216,7 @@ struct FoodPickerSections: View {
                     Button("즐겨찾기 등록") {
                         model.addAutoMatchToFavorites(result)
                     }
-                    .buttonStyle(.bordered)
+                    .buttonStyle(.glass)
                 }
             }
         }
@@ -177,18 +232,16 @@ struct FoodPickerSections: View {
                 .fontWeight(.bold)
                 .padding(.horizontal, 8)
                 .padding(.vertical, 3)
-                .background(Color.blue.opacity(0.13))
-                .foregroundStyle(.blue)
-                .clipShape(Capsule())
+                .foregroundStyle(Color.accentColor)
+                .glassEffect(.regular.tint(Color.accentColor.opacity(0.18)), in: Capsule())
         case "fallback":
             Text("정확한 값을 찾지 못했어요, 확인해주세요")
                 .font(.caption2)
                 .fontWeight(.bold)
                 .padding(.horizontal, 8)
                 .padding(.vertical, 3)
-                .background(Color.red.opacity(0.13))
-                .foregroundStyle(.red)
-                .clipShape(Capsule())
+                .foregroundStyle(Color("CalorieCoral"))
+                .glassEffect(.regular.tint(Color("CalorieCoral").opacity(0.18)), in: Capsule())
         default:
             EmptyView()
         }
@@ -199,10 +252,12 @@ struct FoodPickerSections: View {
         VStack(alignment: .leading, spacing: 8) {
             Text(message)
                 .foregroundStyle(.secondary)
-            Button("✏️ 직접 등록하러 가기") {
+            Button {
                 fallbackTarget = FallbackPrefillTarget(name: prefillName)
+            } label: {
+                Label("직접 등록하러 가기", systemImage: "pencil")
             }
-            .buttonStyle(.bordered)
+            .buttonStyle(.glass)
         }
     }
 

@@ -2,14 +2,14 @@
 //  MemoEditView.swift
 //  HealthProject
 //
-//  "최근 컨디션 메모" 항목 수정 폼 — 날짜까지 수정 가능(기존에 없던 기능이었는데,
-//  수정 폼을 새로 만드는 김에 같이 지원함)
+//  "컨디션 메모" 작성/수정 시트 — memo가 nil이면 신규 추가, 있으면 수정 모드. 신규 추가도 날짜를
+//  고를 수 있게(기존엔 항상 오늘로 고정) 수정 폼과 화면을 합침
 //
 
 import SwiftUI
 
 struct MemoEditView: View {
-    let memo: MemoRecord
+    let memo: MemoRecord?
     let onSaved: () -> Void
 
     @Environment(\.dismiss) private var dismiss
@@ -27,12 +27,12 @@ struct MemoEditView: View {
         return formatter
     }()
 
-    init(memo: MemoRecord, onSaved: @escaping () -> Void) {
+    init(memo: MemoRecord? = nil, onSaved: @escaping () -> Void) {
         self.memo = memo
         self.onSaved = onSaved
-        self._date = State(initialValue: Self.dateFormatter.date(from: memo.date) ?? Date())
-        self._content = State(initialValue: memo.content)
-        self._symptomScore = State(initialValue: Double(memo.symptomScore))
+        self._date = State(initialValue: memo.flatMap { Self.dateFormatter.date(from: $0.date) } ?? Date())
+        self._content = State(initialValue: memo?.content ?? "")
+        self._symptomScore = State(initialValue: Double(memo?.symptomScore ?? 5))
     }
 
     var body: some View {
@@ -53,7 +53,8 @@ struct MemoEditView: View {
                     }
                 }
             }
-            .navigationTitle("메모 수정")
+            .navigationTitle(memo == nil ? "메모 추가" : "메모 수정")
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("취소") { dismiss() }
@@ -84,25 +85,37 @@ struct MemoEditView: View {
         isSaving = true
         Task {
             do {
-                try await MemoAPIService.updateMemo(
-                    id: memo.id,
-                    date: Self.dateFormatter.string(from: date),
-                    content: content,
-                    symptomScore: Int(symptomScore)
-                )
+                if let memo {
+                    try await MemoAPIService.updateMemo(
+                        id: memo.id,
+                        date: Self.dateFormatter.string(from: date),
+                        content: content,
+                        symptomScore: Int(symptomScore)
+                    )
+                } else {
+                    try await MemoAPIService.createMemo(
+                        date: Self.dateFormatter.string(from: date),
+                        content: content,
+                        symptomScore: Int(symptomScore)
+                    )
+                }
                 isSaving = false
                 Haptics.success()
                 onSaved()
                 dismiss()
             } catch {
                 isSaving = false
-                alertMessage = "수정 실패: \(error.localizedDescription)"
+                alertMessage = "저장 실패: \(error.localizedDescription)"
                 showAlert = true
             }
         }
     }
 }
 
-#Preview {
+#Preview("수정") {
     MemoEditView(memo: MemoRecord(id: 1, date: "2026-07-31", content: "속쓰림", symptomScore: 5), onSaved: {})
+}
+
+#Preview("추가") {
+    MemoEditView(onSaved: {})
 }

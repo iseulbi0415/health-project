@@ -18,18 +18,45 @@ struct ContentView: View {
     var body: some View {
         // NavigationStack: 화면 위쪽에 타이틀("러닝 기록")이 붙은 내비게이션 바를 만들어줌
         NavigationStack {
-            // List: 배열(runs)을 받아서 각 항목마다 아래 클로저(줄 내용)를 반복해서 그려주는 SwiftUI 뷰
-            // runs의 각 요소가 Identifiable(RunRecord.id)이라 별도 id 지정 없이 바로 사용 가능
+            // GradientHeaderView는 List 밖(VStack의 형제)에 둬서 화면 최상단에 전체 폭 배너로
+            // 붙게 함(HomeView/DietTimerView와 동일한 이유)
+            VStack(spacing: 0) {
+                GradientHeaderView(
+                    title: "러닝 기록",
+                    subtitle: "오늘도 힘차게 달려볼까요",
+                    colors: HeaderPalette.coral
+                ) {
+                    HeaderActionButton(systemImage: "plus") {
+                        isShowingAddSheet = true
+                    }
+                }
+
+                runsList
+            }
+            .navigationTitle("")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(.hidden, for: .navigationBar)
+        }
+    }
+
+    // List: 배열(runs)을 받아서 각 항목마다 아래 클로저(줄 내용)를 반복해서 그려주는 SwiftUI 뷰
+    // runs의 각 요소가 Identifiable(RunRecord.id)이라 별도 id 지정 없이 바로 사용 가능
+    private var runsList: some View {
             List(runs) { run in
                 VStack(alignment: .leading, spacing: 4) {
                     HStack {
+                        Image(systemName: "figure.run")
+                            .foregroundStyle(Color("CalorieCoral"))
+                            .font(.subheadline)
                         // 거리 표시 (소수점 둘째 자리까지)
                         Text("\(run.distance, specifier: "%.2f") km")
                             .font(.headline)
+                            .monospacedDigit()
                         Spacer()
                         // 상대 날짜("오늘"/"어제"/"N일 전"), 일주일 이상 지나면 절대 날짜 — RunRecord.relativeDateDisplay
                         Text(run.relativeDateDisplay)
                             .font(.subheadline)
+                            .monospacedDigit()
                             .foregroundStyle(.secondary)
                     }
                     // 시간 / 페이스를 한 줄에 좌우로 나눠서 표시
@@ -39,6 +66,7 @@ struct ContentView: View {
                         Text("페이스 \(run.paceDisplay)")
                     }
                     .font(.subheadline)
+                    .monospacedDigit()
                     .foregroundStyle(.secondary)
                 }
                 .padding(.vertical, 4)
@@ -58,7 +86,7 @@ struct ContentView: View {
                     }
                 }
             }
-            .navigationTitle("러닝 기록")
+            .listStyle(.insetGrouped)
             // overlay: List 위에 로딩/에러/빈 상태 메시지를 겹쳐서 보여줌
             .overlay {
                 if isLoading {
@@ -71,16 +99,6 @@ struct ContentView: View {
                 } else if runs.isEmpty {
                     Text("러닝 기록이 없습니다.")
                         .foregroundStyle(.secondary)
-                }
-            }
-            // 내비게이션 바 오른쪽에 기록 추가 버튼 배치
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button {
-                        isShowingAddSheet = true
-                    } label: {
-                        Image(systemName: "plus")
-                    }
                 }
             }
             // 시트: 화면 아래에서 위로 올라오는 별도 화면. 추가 화면에서 저장에 성공하면
@@ -105,7 +123,6 @@ struct ContentView: View {
             .refreshable {
                 await loadRuns()
             }
-        }
     }
 
     private func deleteRun(_ run: RunRecord) async {

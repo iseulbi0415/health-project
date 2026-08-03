@@ -17,7 +17,7 @@ struct MainTabView: View {
             ContentView()
                 .tabItem { Label("러닝", systemImage: "figure.run") }
             ProfileView()
-                .tabItem { Label("내 정보", systemImage: "person.circle") }
+                .tabItem { Label("내 정보", systemImage: "person.text.rectangle") }
         }
     }
 }

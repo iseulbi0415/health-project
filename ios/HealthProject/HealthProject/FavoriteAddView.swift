@@ -52,7 +52,9 @@ struct FavoriteAddView: View {
                 }
 
                 Section {
-                    Toggle("⚠️ 트리거 음식(역류 유발 가능)", isOn: $isTrigger)
+                    Toggle(isOn: $isTrigger) {
+                        Label("트리거 음식(역류 유발 가능)", systemImage: "exclamationmark.triangle.fill")
+                    }
                 }
             }
             .navigationTitle(existingFavorite == nil ? "즐겨찾기 등록" : "즐겨찾기 수정")
