@@ -19,7 +19,7 @@ private struct NewFoodRequest: Encodable {
 }
 
 enum FoodAPIService {
-    private static let baseURL = "http://localhost:8080"
+    private static let baseURL = APIConfig.baseURL
 
     static func fetchTodayFoods(date: String) async throws -> [FoodRecord] {
         guard let url = URL(string: "\(baseURL)/api/foods?date=\(date)") else {

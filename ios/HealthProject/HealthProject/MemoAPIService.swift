@@ -21,7 +21,7 @@ struct MemoRecord: Decodable, Identifiable {
 }
 
 enum MemoAPIService {
-    private static let baseURL = "http://localhost:8080"
+    private static let baseURL = APIConfig.baseURL
 
     static func fetchMemos(date: String? = nil) async throws -> [MemoRecord] {
         var urlString = "\(baseURL)/api/memos"

@@ -19,7 +19,7 @@ struct UserProfile: Codable {
 }
 
 enum UserProfileAPIService {
-    private static let baseURL = "http://localhost:8080"
+    private static let baseURL = APIConfig.baseURL
 
     static func fetchProfile() async throws -> UserProfile {
         guard let url = URL(string: "\(baseURL)/api/users/me/profile") else {

@@ -8,7 +8,7 @@
 import Foundation
 
 enum RecordSummaryAPIService {
-    private static let baseURL = "http://localhost:8080"
+    private static let baseURL = APIConfig.baseURL
 
     static func fetchMonthSummary(year: Int, month: Int) async throws -> Set<String> {
         guard let url = URL(string: "\(baseURL)/api/records/summary?year=\(year)&month=\(month)") else {

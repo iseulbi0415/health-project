@@ -23,8 +23,7 @@ private struct NativeLoginRequest: Encodable {
 
 enum RunAPIService {
 
-    // 시뮬레이터는 Mac의 localhost를 그대로 쓸 수 있지만, 실기기로 테스트할 땐 Mac의 LAN IP로 바꿔야 함
-    private static let baseURL = "http://localhost:8080"
+    private static let baseURL = APIConfig.baseURL
 
     // 체중 입력 화면이 아직 없어서(오늘 범위 아님), 웹/백엔드에 이미 있던 임시 기본값(60kg)을 그대로 씀
     private static let defaultWeightKg = 60.0
