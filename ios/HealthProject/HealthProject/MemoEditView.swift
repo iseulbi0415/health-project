@@ -61,6 +61,7 @@ struct MemoEditView: View {
                     VStack(alignment: .leading) {
                         Text("증상 점수: \(Int(symptomScore))")
                         Slider(value: $symptomScore, in: 1...10, step: 1)
+                            .onChange(of: symptomScore) { _, _ in Haptics.selection() }
                     }
                 }
             }

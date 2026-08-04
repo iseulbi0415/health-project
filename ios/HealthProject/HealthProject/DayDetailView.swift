@@ -29,6 +29,10 @@ struct DayDetailView: View {
 
     @State private var isShowingFoodPicker = false
     @State private var isShowingRunAdd = false
+    // 스와이프/컨텍스트 메뉴 "수정"에서 열리는 편집 시트 대상 — DietTimerView/ContentView/ProfileView와 동일 패턴
+    @State private var editingFood: FoodRecord?
+    @State private var editingRun: RunRecord?
+    @State private var editingMemo: MemoRecord?
 
     @State private var memoText = ""
     @State private var symptomScore: Double = 5
@@ -55,6 +59,21 @@ struct DayDetailView: View {
                                 Spacer()
                                 Text("\(food.calorie) kcal")
                             }
+                            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                Button("삭제", role: .destructive) {
+                                    Task { await deleteFood(food) }
+                                }
+                            }
+                            .swipeActions(edge: .leading) {
+                                Button("수정") { editingFood = food }
+                                    .tint(.blue)
+                            }
+                            .contextMenu {
+                                Button("수정") { editingFood = food }
+                                Button("삭제", role: .destructive) {
+                                    Task { await deleteFood(food) }
+                                }
+                            }
                         }
                     }
                     Button("이 날짜로 음식 추가") { isShowingFoodPicker = true }
@@ -69,6 +88,21 @@ struct DayDetailView: View {
                                 Text("\(run.distance, specifier: "%.2f") km")
                                 Spacer()
                                 Text(run.timeDisplay)
+                            }
+                            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                Button("삭제", role: .destructive) {
+                                    Task { await deleteRun(run) }
+                                }
+                            }
+                            .swipeActions(edge: .leading) {
+                                Button("수정") { editingRun = run }
+                                    .tint(.blue)
+                            }
+                            .contextMenu {
+                                Button("수정") { editingRun = run }
+                                Button("삭제", role: .destructive) {
+                                    Task { await deleteRun(run) }
+                                }
                             }
                         }
                     }
@@ -86,14 +120,41 @@ struct DayDetailView: View {
                                     .font(.footnote)
                                     .foregroundStyle(.secondary)
                             }
+                            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                Button("삭제", role: .destructive) {
+                                    Task { await deleteMemo(memo) }
+                                }
+                            }
+                            .swipeActions(edge: .leading) {
+                                Button("수정") { editingMemo = memo }
+                                    .tint(.blue)
+                            }
+                            .contextMenu {
+                                Button("수정") { editingMemo = memo }
+                                Button("삭제", role: .destructive) {
+                                    Task { await deleteMemo(memo) }
+                                }
+                            }
                         }
                     }
 
-                    TextEditor(text: $memoText)
-                        .frame(minHeight: 80)
+                    // TextEditor는 TextField와 달리 placeholder가 없어서, 내용이 비어있을 때만
+                    // 안내 문구를 겹쳐 보여줌(MemoEditView와 동일한 패턴)
+                    ZStack(alignment: .topLeading) {
+                        if memoText.isEmpty {
+                            Text("오늘 컨디션이나 증상을 자유롭게 적어보세요")
+                                .foregroundStyle(.secondary)
+                                .padding(.top, 8)
+                                .padding(.leading, 5)
+                                .allowsHitTesting(false)
+                        }
+                        TextEditor(text: $memoText)
+                            .frame(minHeight: 80)
+                    }
                     VStack(alignment: .leading) {
                         Text("증상 점수: \(Int(symptomScore))")
                         Slider(value: $symptomScore, in: 1...10, step: 1)
+                            .onChange(of: symptomScore) { _, _ in Haptics.selection() }
                     }
                     Button(action: saveMemo) {
                         if isSavingMemo {
@@ -121,6 +182,22 @@ struct DayDetailView: View {
                     isShowingRunAdd = false
                     Task { await loadDayDetail() }
                 }, recordedAt: recordedAtNow())
+            }
+            .sheet(item: $editingFood) { food in
+                FoodRecordEditView(food: food, onSaved: {
+                    Task { await loadDayDetail() }
+                })
+            }
+            .sheet(item: $editingRun) { run in
+                RunAddView(onSaved: {
+                    editingRun = nil
+                    Task { await loadDayDetail() }
+                }, existingRun: run)
+            }
+            .sheet(item: $editingMemo) { memo in
+                MemoEditView(memo: memo, onSaved: {
+                    Task { await loadDayDetail() }
+                })
             }
             .alert("메모", isPresented: $showMemoAlert) {
                 Button("확인", role: .cancel) {}
@@ -154,6 +231,36 @@ struct DayDetailView: View {
             errorMessage = "불러오기 실패: \(error.localizedDescription)"
         }
         isLoading = false
+    }
+
+    private func deleteFood(_ food: FoodRecord) async {
+        do {
+            try await FoodAPIService.deleteFood(id: food.id)
+            Haptics.success()
+            await loadDayDetail()
+        } catch {
+            errorMessage = "삭제 실패: \(error.localizedDescription)"
+        }
+    }
+
+    private func deleteRun(_ run: RunRecord) async {
+        do {
+            try await RunAPIService.deleteRun(id: run.id)
+            Haptics.success()
+            await loadDayDetail()
+        } catch {
+            errorMessage = "삭제 실패: \(error.localizedDescription)"
+        }
+    }
+
+    private func deleteMemo(_ memo: MemoRecord) async {
+        do {
+            try await MemoAPIService.deleteMemo(id: memo.id)
+            Haptics.success()
+            await loadDayDetail()
+        } catch {
+            errorMessage = "삭제 실패: \(error.localizedDescription)"
+        }
     }
 
     private func saveMemo() {
