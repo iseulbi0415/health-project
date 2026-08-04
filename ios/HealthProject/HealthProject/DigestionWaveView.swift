@@ -142,7 +142,7 @@ struct DigestionWaveView: View {
         // width가 파장(wavelength = width / crestsVisible)의 정수배여야 되감기는 순간이 안 튐 —
         // 즉 crestsVisible 자체가 정수여야 함. 예전에 1.5였을 때 되감길 때마다 반 주기(180도)
         // 어긋난 채로 이어져서 물결이 순간적으로 "재배치"되는 것처럼 보이는 버그가 있었음
-        var crestsVisible: CGFloat { self == .compact ? 1 : 2 }
+        var crestsVisible: CGFloat { 1 }
         var cornerRadius: CGFloat { 16 }
         var countdownFont: Font {
             self == .compact ? .title3.bold() : .largeTitle.bold()
@@ -181,9 +181,18 @@ struct DigestionWaveView: View {
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                 if style == .hero {
-                    Text(warningText)
-                        .font(.footnote)
-                        .foregroundStyle(isFinished ? Color("SuccessGreen") : Color("CalorieCoral"))
+                    // Label 대신 HStack — Label 기본 스타일은 아이콘-텍스트 간격이 넓게
+                    // 고정되어 있어서, 캡슐 안에서 더 붙어 보이도록 spacing을 직접 좁게 지정함
+                    HStack(spacing: 4) {
+                        Image(systemName: isFinished ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
+                        Text(warningText)
+                    }
+                    .font(.footnote)
+                    .foregroundStyle(isFinished ? Color("SuccessGreen") : Color("CalorieCoral"))
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 4)
+                    .glassEffect(.regular.tint(Color.white.opacity(0.75)), in: Capsule())
+                    .frame(maxWidth: .infinity, alignment: .center)
                 }
             }
             .padding(.horizontal, 8)
@@ -256,7 +265,7 @@ private struct DigestionEmptyStateView: View {
         levelFraction: { _ in 0.68 },
         countdownText: "01:42:30",
         endTimeText: "오후 11:47에 완료",
-        warningText: "🙅‍♀️ 아직 눕지 마세요!",
+        warningText: "지금 누우면 역류 위험이 있어요",
         isFinished: false,
         style: .hero
     )
@@ -268,7 +277,7 @@ private struct DigestionEmptyStateView: View {
         levelFraction: { _ in 0.3 },
         countdownText: "00:18:04",
         endTimeText: "오후 9:10에 완료",
-        warningText: "🙅‍♀️ 아직 눕지 마세요!",
+        warningText: "지금 누우면 역류 위험이 있어요",
         isFinished: false,
         style: .compact
     )

@@ -49,7 +49,7 @@ final class DigestionTimerManager: ObservableObject {
 
     func warningText(at now: Date) -> String {
         guard endTime != nil else { return "" }
-        return remainingSeconds(at: now) > 0 ? "🙅‍♀️ 아직 눕지 마세요!" : "소화 완료! 이제 누우셔도 됩니다!"
+        return remainingSeconds(at: now) > 0 ? "지금 누우면 역류 위험이 있어요" : "소화 완료! 이제 누우셔도 됩니다!"
     }
 
     // 이미 타이머가 돌고 있으면 남은 시간과 새로 계산된 시간 중 더 긴 쪽을 쓰는 "안전 마진" 규칙
