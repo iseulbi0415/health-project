@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.HashMap;
 import java.util.Map;
 
 // 네이티브 앱 전용 Apple Sign-In 진입점. 카카오 로그인과는 완전히 분리된 별도 경로 —
@@ -29,7 +30,12 @@ public class AppleAuthController {
                                                        HttpServletRequest request, HttpServletResponse response) {
         try {
             User user = appleAuthService.login(requestBody.identityToken(), requestBody.fullName(), request, response);
-            return ResponseEntity.ok(Map.of("loggedIn", true, "nickname", user.getNickname()));
+            // Map.of는 값이 null이면 NPE를 던짐 — Apple은 이름 공유가 선택사항이라
+            // user.getNickname()이 null인 경우가 실제로 있어서(실기기 테스트로 확인됨) HashMap 사용
+            Map<String, Object> body = new HashMap<>();
+            body.put("loggedIn", true);
+            body.put("nickname", user.getNickname());
+            return ResponseEntity.ok(body);
         } catch (BadCredentialsException e) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("loggedIn", false));
         }
