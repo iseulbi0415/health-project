@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import AuthenticationServices
 import KakaoSDKAuth
 import KakaoSDKUser
 
@@ -32,6 +33,15 @@ struct LoginView: View {
                     Text("카카오 로그인")
                 }
             }
+            .disabled(isLoggingIn)
+
+            SignInWithAppleButton(.signIn) { request in
+                request.requestedScopes = [.fullName]
+            } onCompletion: { result in
+                handleAppleSignIn(result)
+            }
+            .signInWithAppleButtonStyle(.black)
+            .frame(height: 44)
             .disabled(isLoggingIn)
 
             if let errorMessage {
@@ -80,6 +90,40 @@ struct LoginView: View {
             } else {
                 UserApi.shared.loginWithKakaoAccount(completion: completion)
             }
+        }
+    }
+
+    // 카카오 login()과 동일한 흐름(로딩/에러 상태, hydrateLocalCache, authManager.login())을
+    // 그대로 재사용 — nonce 검증은 이번 범위에서 의도적으로 스킵(서명/issuer/audience 검증으로 충분,
+    // 재전송 공격 방어까지 강화하려면 추후 nonce 추가 가능)
+    private func handleAppleSignIn(_ result: Result<ASAuthorization, Error>) {
+        switch result {
+        case .success(let authorization):
+            guard let credential = authorization.credential as? ASAuthorizationAppleIDCredential,
+                  let tokenData = credential.identityToken,
+                  let identityToken = String(data: tokenData, encoding: .utf8) else {
+                errorMessage = "로그인 실패: Apple 인증 정보를 읽을 수 없어요"
+                return
+            }
+            // fullName은 Apple이 최초 로그인 시에만 내려줌(재로그인 시 nil)
+            let fullName = [credential.fullName?.givenName, credential.fullName?.familyName]
+                .compactMap { $0 }
+                .joined(separator: " ")
+            isLoggingIn = true
+            errorMessage = nil
+            Task {
+                do {
+                    try await RunAPIService.loginWithApple(identityToken: identityToken, fullName: fullName.isEmpty ? nil : fullName)
+                    await UserProfileAPIService.hydrateLocalCache()
+                    isLoggingIn = false
+                    authManager.login()
+                } catch {
+                    isLoggingIn = false
+                    errorMessage = "로그인 실패: \(error.localizedDescription)"
+                }
+            }
+        case .failure(let error):
+            errorMessage = "로그인 실패: \(error.localizedDescription)"
         }
     }
 }

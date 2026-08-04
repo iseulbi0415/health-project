@@ -20,6 +20,10 @@ public class User {
     @Column(unique = true, nullable = false)
     private String kakaoId;
 
+    // Apple Sign-In 사용자용 — kakaoId와 달리 nullable(카카오로 가입한 기존 사용자는 계속 null)
+    @Column(unique = true)
+    private String appleId;
+
     private String nickname;
 
     // "내 정보"(BMR/목표 칼로리 계산용 입력값) — 예전엔 iOS에서 UserDefaults에만 저장해서 앱 삭제 시
