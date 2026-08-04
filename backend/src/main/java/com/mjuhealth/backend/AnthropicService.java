@@ -11,10 +11,15 @@ import org.springframework.web.client.RestClientResponseException;
 
 import java.net.http.HttpClient;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -92,6 +97,52 @@ public class AnthropicService {
                 .filter(index -> index >= 0 && index < candidates.size());
     }
 
+    private static final int ESTIMATION_ATTEMPTS = 3;
+    // 블로킹 I/O(RestClient HTTP 호출) fan-out 전용 — Java 17이라 virtual thread(21+)는
+    // 못 쓰고, 요청마다 새로 만들지 않도록 서비스 필드로 한 번만 생성해 재사용함
+    private final ExecutorService estimationExecutor = Executors.newCachedThreadPool();
+
+    // estimateServingGramsOnce()를 3번 병렬로 실행해서, 성공한 값들의 중앙값을 최종 결과로 씀
+    // (자기일관성/self-consistency) — 아래 estimateServingGramsOnce() 주석 참고
+    public Optional<Integer> estimateServingGrams(String foodName, boolean isStandardizedProduct) {
+        long startedAt = System.currentTimeMillis();
+        List<CompletableFuture<Optional<Integer>>> attempts = IntStream.range(0, ESTIMATION_ATTEMPTS)
+                .mapToObj(i -> CompletableFuture.supplyAsync(
+                        () -> estimateServingGramsOnce(foodName, isStandardizedProduct), estimationExecutor))
+                .toList();
+
+        List<Integer> successes = attempts.stream()
+                .map(CompletableFuture::join)
+                .flatMap(Optional::stream)
+                .toList();
+
+        log.info("estimateServingGrams({}): {}/{} 성공, {}ms 소요", foodName, successes.size(),
+                ESTIMATION_ATTEMPTS, System.currentTimeMillis() - startedAt);
+
+        if (successes.isEmpty()) {
+            return Optional.empty();
+        }
+        return Optional.of(median(successes));
+    }
+
+    // 짝수 개일 때 중간 두 값의 평균(반올림) — FoodAutoMatchService.pickClosestToMedian()의
+    // 중앙값 계산 방식과 동일한 관례를 그대로 따름(이 프로젝트에서 이미 확립된 패턴)
+    private Integer median(List<Integer> values) {
+        List<Integer> sorted = new ArrayList<>(values);
+        Collections.sort(sorted);
+        int size = sorted.size();
+        if (size % 2 == 1) {
+            return sorted.get(size / 2);
+        }
+        return Math.round((sorted.get(size / 2 - 1) + sorted.get(size / 2)) / 2f);
+    }
+
+    // 그램수 추정은 매 요청마다 값이 흔들리는 문제(예: 시리얼이 40g/50g/60g로 갈리는 사례)가
+    // 있어서, 캐싱 대신 자기일관성(self-consistency) 방식을 씀 — 아래 estimateServingGrams()가
+    // 이 메서드를 3번 병렬로 호출해서 성공한 값들의 중앙값을 최종 결과로 씀. temperature는
+    // 일부러 낮추지 않음(그대로 API 기본값) — 3번의 시도가 서로 다른 값을 낼 수 있어야
+    // 자기일관성 방식 자체가 의미가 있기 때문
+    //
     // 확정된 음식 하나의 1인분(1회 제공량)을 그램(g) 단위로 추정. GERD 케어 앱이라 섭취 칼로리를
     // 과소평가하지 않는 게 더 안전하므로, 보수적으로(상한선에 가깝게) 추정하도록 명시적으로 지시함.
     //
@@ -99,7 +150,7 @@ public class AnthropicService {
     // web_search 2단계 호출(callToolWithWebSearch)을 씀 — 조리식/원재료는 애초에 표준화된 포장
     // 단위가 없어서 검색이 무의미함. 표준화 제품이 아닐 땐 기존처럼 단일 강제 호출로 100% 구조화된
     // 응답을 보장함
-    public Optional<Integer> estimateServingGrams(String foodName, boolean isStandardizedProduct) {
+    private Optional<Integer> estimateServingGramsOnce(String foodName, boolean isStandardizedProduct) {
         Map<String, Object> tool = Map.of(
                 "name", "estimate_serving",
                 "description", "특정 음식 1인분의 예상 중량을 그램(g) 단위로 추정한다",
