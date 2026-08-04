@@ -26,22 +26,38 @@ struct LoginView: View {
             Text("로그인하고 나만의 기록을 시작하세요")
                 .foregroundStyle(.secondary)
 
+            // 카카오 공식 로그인 버튼 가이드라인(옐로우 #FEE500 배경 + 검정 텍스트) 적용.
+            // SDK에 공식 배포용 심볼 에셋이 번들되어 있지 않아(내부 브릿지 전용 리소스만 있음)
+            // 아이콘 없이 텍스트만 — 애플 버튼과 높이/폭을 맞춰 두 버튼이 나란히 통일감 있게 보이게 함
             Button(action: login) {
-                if isLoggingIn {
-                    ProgressView()
-                } else {
-                    Text("카카오 로그인")
+                Group {
+                    if isLoggingIn {
+                        ProgressView()
+                    } else {
+                        Text("카카오 로그인")
+                            .font(.system(size: 15, weight: .medium))
+                    }
                 }
+                .frame(maxWidth: .infinity)
+                .frame(height: 44)
             }
+            .foregroundStyle(.black)
+            .background(Color(red: 254 / 255, green: 229 / 255, blue: 0 / 255))
+            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
             .disabled(isLoggingIn)
 
+            // SignInWithAppleButton의 문구는 기기 시스템 언어를 따라가는데, 이 앱은 로컬라이징이
+            // 안 되어 있어(developmentRegion=en, 지원 언어 선언 없음) 기기가 한국어여도 시스템이
+            // 영어로 표시하는 경우가 있음 — locale을 명시적으로 ko_KR로 고정해서 항상 "Apple로 로그인"으로 뜨게 함
             SignInWithAppleButton(.signIn) { request in
                 request.requestedScopes = [.fullName]
             } onCompletion: { result in
                 handleAppleSignIn(result)
             }
             .signInWithAppleButtonStyle(.black)
+            .frame(maxWidth: .infinity)
             .frame(height: 44)
+            .environment(\.locale, Locale(identifier: "ko_KR"))
             .disabled(isLoggingIn)
 
             if let errorMessage {
