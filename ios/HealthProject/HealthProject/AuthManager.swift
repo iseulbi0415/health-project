@@ -25,6 +25,14 @@ final class AuthManager: ObservableObject {
     func logout() {
         UserDefaults.standard.set(false, forKey: "isLoggedIn")
         isLoggedIn = false
+        // 소화 타이머/즐겨찾기 둘 다 서버 저장 없이 기기 UserDefaults에만 남는 로컬 상태라,
+        // 계정을 전환해도(로그아웃 후 다른 계정으로 로그인) 자동으로 안 지워짐 — 로그아웃
+        // 시점에 명시적으로 같이 초기화해서 다음 로그인 계정에 이전 계정 데이터가 안 보이게 함
+        DigestionTimerManager.shared.cancel()
+        // FoodPickerModel은 싱글턴이 아니라 로그인 게이트가 화면을 새로 그릴 때 인스턴스
+        // 자체는 새로 만들어지지만, loadFavorites()가 이 UserDefaults 키를 그대로 읽어오므로
+        // 키 자체를 지워야 함
+        UserDefaults.standard.removeObject(forKey: "favoriteFoods")
     }
 
     // 앱 시작 시 UserDefaults 값만 믿지 않고 서버에 세션이 진짜 살아있는지 확인.
