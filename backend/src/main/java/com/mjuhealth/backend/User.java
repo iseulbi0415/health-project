@@ -17,7 +17,10 @@ public class User {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(unique = true, nullable = false)
+    // Apple 전용 사용자는 kakaoId가 없어서(appleId만 채움) nullable이어야 함 —
+    // nullable=false였을 때 Apple 신규 가입 INSERT가 NOT NULL 제약 위반으로 500 에러 발생했음.
+    // unique 제약은 유지(카카오 로그인 흐름은 여전히 매번 값을 채워 저장하므로 동작 변화 없음)
+    @Column(unique = true)
     private String kakaoId;
 
     // Apple Sign-In 사용자용 — kakaoId와 달리 nullable(카카오로 가입한 기존 사용자는 계속 null)
