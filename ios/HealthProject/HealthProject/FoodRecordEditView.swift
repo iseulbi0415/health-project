@@ -23,6 +23,13 @@ struct FoodRecordEditView: View {
     @State private var showAlert = false
     @State private var alertMessage = ""
 
+    // 1개당 칼로리 — 신규 생성 시 quantity는 항상 1로 고정되므로, 이 화면에
+    // 처음 들어온 시점의 food.calorie ÷ food.quantity가 정확한 1개당 기준값.
+    // 수량을 바꾸면 이 값 × 새 수량으로 calorieText를 재계산함(단, 재계산 이후
+    // 사용자가 칼로리 필드를 직접 고치면 그 값이 그대로 저장됨 — 수량을 다시
+    // 바꾸기 전까진 자동 재계산이 덮어쓰지 않음)
+    private let caloriePerUnit: Double
+
     init(food: FoodRecord, onSaved: @escaping () -> Void) {
         self.food = food
         self.onSaved = onSaved
@@ -32,6 +39,7 @@ struct FoodRecordEditView: View {
         self._meal = State(initialValue: Meal(rawValue: food.meal ?? "") ?? .breakfast)
         self._digestCategory = State(initialValue: DigestCategory(rawValue: Int(food.digestTime) ?? DigestCategory.normal.rawValue) ?? .normal)
         self._isTrigger = State(initialValue: food.isTrigger)
+        self.caloriePerUnit = food.quantity > 0 ? Double(food.calorie) / Double(food.quantity) : Double(food.calorie)
     }
 
     var body: some View {
@@ -43,6 +51,10 @@ struct FoodRecordEditView: View {
                         .keyboardType(.numberPad)
                     TextField("수량", text: $quantityText)
                         .keyboardType(.numberPad)
+                        .onChange(of: quantityText) { _, newValue in
+                            guard let quantity = Int(newValue), quantity > 0 else { return }
+                            calorieText = String(Int((caloriePerUnit * Double(quantity)).rounded()))
+                        }
                 }
 
                 Section("끼니") {
