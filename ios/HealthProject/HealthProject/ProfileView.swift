@@ -47,7 +47,8 @@ struct ProfileView: View {
               let age = Double(ageText) else { return nil }
         let bmr = BMRCalculator.bmr(heightCm: height, weightKg: weight, age: age, gender: gender)
         let tdee = BMRCalculator.tdee(heightCm: height, weightKg: weight, age: age, gender: gender, activity: activityLevel)
-        return (Int(bmr.rounded()), Int(tdee.rounded()), Int((tdee + 400).rounded()))
+        let bulk = BMRCalculator.bulkGoal(heightCm: height, weightKg: weight, age: age, gender: gender, activity: activityLevel)
+        return (Int(bmr.rounded()), Int(tdee.rounded()), Int(bulk.rounded()))
     }
 
     var body: some View {

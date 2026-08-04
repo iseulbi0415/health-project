@@ -25,18 +25,48 @@ struct HomeView: View {
     // 스피너로 기존 데이터를 가리지 않고 조용히 백그라운드에서 갱신하기 위한 플래그
     @State private var hasLoadedOnce = false
 
+    // ── 1번 상태 (탭 세그먼트 컨트롤 방식) ──────────────────────────────────
+    // "오늘 칼로리" 카드에서 기준값(유지/목표)을 탭으로 전환하는 인터랙션. 나중에 롱프레스/스와이프 등
+    // 다른 방식으로 교체될 수 있어서, 관련 상태·계산·서브뷰를 이 표시 사이에 모아둠 — 교체 시 이 블록과
+    // CalorieReferenceModeToggle struct, 카드 안의 사용부만 지우고 바꾸면 나머지 로직은 그대로 유지됨.
+    enum CalorieReferenceMode {
+        case maintenance // 유지 (TDEE)
+        case goal        // 목표 (TDEE + 400)
+    }
+    @State private var calorieReferenceMode: CalorieReferenceMode = .maintenance
+    // ─────────────────────────────────────────────────────────────────
+
     private var totalCalories: Int {
         todayFoods.reduce(0) { $0 + $1.calorie }
     }
 
     // ProfileView에서 "계산" 버튼을 눌러야만(hasCalculatedGoal) 목표 칼로리를 보여줌 — 웹의
     // localStorage "tdee" 존재 여부와 동등한 조건(입력값만 채워져 있고 계산을 안 눌렀으면 목표 없음 상태 유지)
-    private var goalCalories: Double? {
+    private var maintenanceCalories: Double? {
         guard hasCalculatedGoal,
               let height = Double(heightText),
               let weight = Double(weightText),
               let age = Double(ageText) else { return nil }
         return BMRCalculator.tdee(heightCm: height, weightKg: weight, age: age, gender: gender, activity: activityLevel)
+    }
+
+    // 1번 상태 (탭 세그먼트 컨트롤 방식) 전용 — "목표" 세그먼트 선택 시 쓰는 값 (TDEE + 400)
+    private var goalBulkCalories: Double? {
+        guard hasCalculatedGoal,
+              let height = Double(heightText),
+              let weight = Double(weightText),
+              let age = Double(ageText) else { return nil }
+        return BMRCalculator.bulkGoal(heightCm: height, weightKg: weight, age: age, gender: gender, activity: activityLevel)
+    }
+
+    // 1번 상태 (탭 세그먼트 컨트롤 방식) 전용 — calorieReferenceMode에 따라 카드에 실제로 표시할 기준값.
+    // 이 프로퍼티가 카드 뷰와 세그먼트 상태 사이의 유일한 연결점이라, 인터랙션 방식이 바뀌어도
+    // 카드 쪽은 이 이름만 계속 읽으면 되게 하기 위한 어댑터 역할
+    private var referenceCalories: Double? {
+        switch calorieReferenceMode {
+        case .maintenance: return maintenanceCalories
+        case .goal: return goalBulkCalories
+        }
     }
 
     var body: some View {
@@ -78,17 +108,21 @@ struct HomeView: View {
                         Text(errorMessage)
                             .foregroundStyle(.red)
                             .font(.footnote)
-                    } else if let goalCalories {
+                    } else if let referenceCalories {
                         HStack(spacing: 6) {
                             Image(systemName: "flame.fill")
                                 .font(.footnote)
                                 .foregroundStyle(Color("CalorieCoral"))
-                            Text("\(totalCalories) / \(Int(goalCalories.rounded())) kcal")
+                            Text("\(totalCalories) / \(Int(referenceCalories.rounded())) kcal")
                                 .font(.title2)
                                 .bold()
                                 .monospacedDigit()
+                            Spacer()
+                            // 1번 상태 (탭 세그먼트 컨트롤 방식) — 애니메이션은 이 바인딩 하나에만 걸어서
+                            // 숫자/게이지 값 전환만 기본 애니메이션으로 자연스럽게 바뀌게 함
+                            CalorieReferenceModeToggle(mode: $calorieReferenceMode.animation(.default))
                         }
-                        ProgressView(value: min(Double(totalCalories) / goalCalories, 1.0))
+                        ProgressView(value: min(Double(totalCalories) / referenceCalories, 1.0))
                             .tint(Color("CalorieCoral"))
                             .frame(height: 12)
                     } else {
@@ -182,4 +216,37 @@ struct HomeView: View {
 #Preview {
     HomeView()
         .environmentObject(DigestionTimerManager.shared)
+}
+
+// 1번 상태 (탭 세그먼트 컨트롤 방식) — "오늘 칼로리" 카드에서 유지/목표 기준값을 탭으로 전환하는
+// 작은 세그먼트 컨트롤. 네이티브 Picker(.segmented)가 아니라 직접 그린 이유: 카드 폭에 맞는
+// 초소형 사이즈(11pt 폰트)가 필요해서. 롱프레스/스와이프 등 다른 인터랙션으로 나중에 통째로
+// 바꿀 수 있도록 별도 struct로 분리 — 교체 시 이 struct만 지우고 HomeView 카드의 사용부
+// (CalorieReferenceModeToggle(mode:) 호출 한 줄)만 바꾸면 됨
+private struct CalorieReferenceModeToggle: View {
+    @Binding var mode: HomeView.CalorieReferenceMode
+
+    var body: some View {
+        HStack(spacing: 4) {
+            segment("유지", isSelected: mode == .maintenance) { mode = .maintenance }
+            segment("목표", isSelected: mode == .goal) { mode = .goal }
+        }
+        .padding(3)
+        .background(Color(.systemGray6), in: Capsule())
+    }
+
+    @ViewBuilder
+    private func segment(_ title: String, isSelected: Bool, action: @escaping () -> Void) -> some View {
+        Text(title)
+            .font(.system(size: 11))
+            .foregroundStyle(isSelected ? .primary : .secondary)
+            .padding(.vertical, 3)
+            .padding(.horizontal, 10)
+            .background {
+                if isSelected {
+                    Capsule().fill(.white)
+                }
+            }
+            .onTapGesture(perform: action)
+    }
 }

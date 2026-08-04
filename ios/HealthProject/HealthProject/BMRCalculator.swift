@@ -52,4 +52,12 @@ enum BMRCalculator {
     static func tdee(heightCm: Double, weightKg: Double, age: Double, gender: Gender, activity: ActivityLevel) -> Double {
         bmr(heightCm: heightCm, weightKg: weightKg, age: age, gender: gender) * activity.coefficient
     }
+
+    // 증량 목표(목표 칼로리) = 유지 칼로리(TDEE) + 400kcal 고정 서지 — 일반적으로 권장되는
+    // 300~500kcal 범위 내 값. ProfileView(BMR 계산 화면)와 HomeView("오늘 칼로리" 카드의 "목표"
+    // 세그먼트)가 같은 값을 써야 해서 여기 공유 계산에 둠 — 인라인으로 각자 계산하면 두 화면
+    // 숫자가 갈라지는 버그가 생길 수 있음(이 파일 상단 주석과 동일한 이유)
+    static func bulkGoal(heightCm: Double, weightKg: Double, age: Double, gender: Gender, activity: ActivityLevel) -> Double {
+        tdee(heightCm: heightCm, weightKg: weightKg, age: age, gender: gender, activity: activity) + 400
+    }
 }
