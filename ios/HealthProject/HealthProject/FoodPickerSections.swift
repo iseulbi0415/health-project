@@ -164,7 +164,12 @@ struct FoodPickerSections: View {
     @ViewBuilder
     private func autoMatchCard(_ result: FoodAutoMatchResult) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            matchTypeBadge(result.matchType)
+            VStack(alignment: .leading, spacing: 4) {
+                matchTypeBadge(result.matchType)
+                if result.isServingEstimateFallback {
+                    servingEstimateFallbackBadge()
+                }
+            }
             Text(result.name)
                 .font(.headline)
             if let grams = result.estimatedServingGrams {
@@ -210,9 +215,9 @@ struct FoodPickerSections: View {
                 .buttonStyle(.glassProminent)
                 .tint(.accentColor)
 
-                // fallback(AI 선택까지 실패해서 관련도순 1위로 대체된 값)이면 부정확한 값을 영구
-                // 저장하는 걸 막기 위해 즐겨찾기 등록 버튼을 숨김
-                if result.matchType != "fallback" {
+                // fallback(AI 선택까지 실패해서 관련도순 1위로 대체된 값)이거나 그램수 추정
+                // 자체가 실패한 값이면, 부정확한 값을 영구 저장하는 걸 막기 위해 즐겨찾기 등록 버튼을 숨김
+                if result.matchType != "fallback" && !result.isServingEstimateFallback {
                     Button("즐겨찾기 등록") {
                         model.addAutoMatchToFavorites(result)
                     }
@@ -245,6 +250,20 @@ struct FoodPickerSections: View {
         default:
             EmptyView()
         }
+    }
+
+    // matchTypeBadge와 별개 축 — 음식 후보 선택은 성공했지만 1인분 그램수 AI 추정이 실패해서
+    // 100g 기본값으로 조용히 대체된 경우를 알려줌(FoodAutoMatchService.java의 그램수 추정 실패 폴백).
+    // matchType과 무관하게(예: "exact" 경로에서도) 뜰 수 있어 matchTypeBadge와 독립적으로 렌더링함
+    @ViewBuilder
+    private func servingEstimateFallbackBadge() -> some View {
+        Text("1인분 양 추정에 실패해 100g 기준으로 표시돼요")
+            .font(.caption2)
+            .fontWeight(.bold)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 3)
+            .foregroundStyle(Color("CalorieCoral"))
+            .glassEffect(.regular.tint(Color("CalorieCoral").opacity(0.18)), in: Capsule())
     }
 
     @ViewBuilder
