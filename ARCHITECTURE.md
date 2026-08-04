@@ -173,6 +173,50 @@
   실패하면 에러를 던지지 않고 빈 배열(`[]`)로 응답 — 공공API 장애가 우리 앱 전체를 죽이지 않게 하기 위함
 - 같은 음식명이 지역/연도별로 수십~수백 건씩 중복 샘플링되어 있는 데이터 특성상, 상위 15건만 잘라서 반환
 
+### 2-5. Food Auto-Match (AI 자동매칭)
+
+| 엔드포인트 | 메서드 | 설명 |
+|---|---|---|
+| `/api/food-search/auto` | GET (`?keyword=검색어`) | 여러 검색 후보 중 하나를 서버가 자동으로 확정해서, 이름/칼로리/1인분 추정 그램수까지 계산해 반환 |
+
+**관련 파일**: `FoodAutoMatchController.java`(엔드포인트) → `FoodAutoMatchService.java`(선택/분기 로직) → `AnthropicService.java`(Claude Haiku 호출, 자기일관성 구현)
+
+**전체 흐름**
+1. 검색어 입력 → `FoodSearchService`로 식약처 API에서 후보 최대 15개 조회(관련도순, 2-4와 동일 경로 재사용)
+2. 후보 중 이름이 검색어와 정확히 일치하는 것만 추출(`exactMatches`)
+3. 분기:
+   - `exactMatches` 있음 → 칼로리 중앙값에 가장 가까운 항목을 선택(`matchType="exact"`, 결정론적)
+   - `exactMatches` 없음 → AI(Claude Haiku)가 관련도 상위 10개 중 하나를 선택(`matchType="ai-selected"`). AI 선택마저 실패하면 관련도 1위로 대체(`matchType="fallback"`)
+4. `exactMatches`가 있었던 경우, 그 안에서 가공식품(`DB_GRP_NM="가공식품"`) 비율을 계산해 80% 이상이면 `isStandardizedProduct=true` — 이 플래그는 "어떤 음식을 고를지"(3단계)와는 무관하고, 다음 단계에서 "웹검색을 동원할지"만 결정함
+5. 선택된 음식의 100g당 칼로리/지방 확정
+6. 1인분 그램수를 3회 병렬 자기일관성(self-consistency)으로 추정:
+   - `isStandardizedProduct=true` → 각 시도가 `web_search` 포함(검색 강제 호출 → 추정 강제 호출의 2단계)
+   - `false` → `web_search` 없이 AI 단일 판단, 마찬가지로 3회 병렬
+   - 성공한 시도들의 중앙값을 최종 그램수로 채택(짝수 개 성공 시 중간 두 값의 평균)
+   - 3회 전부 실패하면 100g 기본값으로 대체하고 `isServingEstimateFallback=true`
+7. 최종 칼로리/지방 = 100g당 값 × 추정 그램수
+8. 프론트는 `matchType` 배지 + (있다면) 그램수 추정 실패 배지를 표시하고, 추정 실패 시 즐겨찾기 등록 버튼을 숨겨 부정확한 100g 기준값이 영구 저장되지 않게 함
+
+**응답 예시**
+```json
+{
+  "name": "시리얼 오리지널",
+  "calorie": 380,
+  "fatGrams": 2.16,
+  "estimatedServingGrams": 75,
+  "estimatedServingCalorie": 285,
+  "estimatedServingFatGrams": 1.62,
+  "matchType": "ai-selected",
+  "isServingEstimateFallback": false
+}
+```
+
+**핵심 설계 판단 (발표 Q&A 대비)**
+- **80% 기준의 역할**: 어떤 음식을 고를지가 아니라, 그램수 추정을 얼마나 정밀하게(웹검색 동원 여부) 할지 결정하는 스위치일 뿐 — 선택 로직(3단계)과는 완전히 독립적인 축
+- **자기일관성 채택 이유**: 메모리 캐싱은 Railway 재배포 시 초기화되는 문제로 배제, DB 캐싱은 대회 제출 일정상 시간/리스크 부담이 커서 대회 이후 과제로 이관(CLAUDE.md 백로그 참고). 자기일관성은 요청 단위로 완결되어 재배포 영향이 없고, 이상값(outlier) 완화 효과가 있어 채택
+- **temperature를 그대로 둔 이유**: 자기일관성이 의미를 가지려면 3회 시도가 서로 다른 값을 낼 수 있어야 하므로 의도적으로 낮추지 않음
+- **정확도 개선과의 구분**: 이번 작업은 AI 판단의 정확도 자체를 높인 게 아니라, 이상값에 덜 흔들리게 안정성을 높인 것 — "정확도 개선"이 아니라 "변동성/이상값 완화"로 설명할 것
+
 ---
 
 ## 3. 데이터 흐름 (예: "음식 추가" 시나리오)
