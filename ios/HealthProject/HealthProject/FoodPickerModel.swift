@@ -46,39 +46,55 @@ final class FoodPickerModel: ObservableObject {
         searchErrorMessage = nil
     }
 
-    func loadFavorites() {
-        guard let data = UserDefaults.standard.data(forKey: "favoriteFoods"),
-              let decoded = try? JSONDecoder().decode([FavoriteFood].self, from: data) else { return }
-        favorites = decoded
+    func loadFavorites() async {
+        do {
+            favorites = try await FavoriteAPIService.fetchFavorites()
+        } catch {
+            alertMessage = "즐겨찾기 불러오기 실패: \(error.localizedDescription)"
+            showAlert = true
+        }
     }
 
-    func saveFavorites() {
-        guard let data = try? JSONEncoder().encode(favorites) else { return }
-        UserDefaults.standard.set(data, forKey: "favoriteFoods")
-    }
-
-    func deleteFavorites(at offsets: IndexSet) {
+    func deleteFavorites(at offsets: IndexSet) async {
+        let toDelete = offsets.map { favorites[$0] }
         favorites.remove(atOffsets: offsets)
-        saveFavorites()
+        for favorite in toDelete {
+            try? await FavoriteAPIService.deleteFavorite(id: favorite.id)
+        }
     }
 
     // .swipeActions/.contextMenu는 인덱스가 아니라 항목 자체를 넘겨주기 때문에 IndexSet 버전과 별도로 필요
-    func deleteFavorite(_ favorite: FavoriteFood) {
-        favorites.removeAll { $0.id == favorite.id }
-        saveFavorites()
-        Haptics.success()
+    func deleteFavorite(_ favorite: FavoriteFood) async {
+        do {
+            try await FavoriteAPIService.deleteFavorite(id: favorite.id)
+            favorites.removeAll { $0.id == favorite.id }
+            Haptics.success()
+        } catch {
+            alertMessage = "삭제 실패: \(error.localizedDescription)"
+            showAlert = true
+        }
     }
 
-    func addNewFavorite(_ favorite: FavoriteFood) {
-        favorites.append(favorite)
-        saveFavorites()
+    func addNewFavorite(_ favorite: FavoriteFood) async {
+        do {
+            let created = try await FavoriteAPIService.createFavorite(favorite)
+            favorites.append(created)
+        } catch {
+            alertMessage = "즐겨찾기 등록 실패: \(error.localizedDescription)"
+            showAlert = true
+        }
     }
 
-    // id는 그대로 유지한 채 나머지 필드만 교체 — 로컬 전용이라 서버 호출 없이 바로 반영됨
-    func updateFavorite(_ favorite: FavoriteFood) {
-        guard let index = favorites.firstIndex(where: { $0.id == favorite.id }) else { return }
-        favorites[index] = favorite
-        saveFavorites()
+    // id는 그대로 유지한 채 나머지 필드만 서버에 반영
+    func updateFavorite(_ favorite: FavoriteFood) async {
+        do {
+            let updated = try await FavoriteAPIService.updateFavorite(favorite)
+            guard let index = favorites.firstIndex(where: { $0.id == updated.id }) else { return }
+            favorites[index] = updated
+        } catch {
+            alertMessage = "수정 실패: \(error.localizedDescription)"
+            showAlert = true
+        }
     }
 
     func performSearch() async {
@@ -138,9 +154,9 @@ final class FoodPickerModel: ObservableObject {
 
     // 검색 결과를 즐겨찾기로 등록해도 출처는 API이므로, 정확한 지방값을 그대로 들고 감 —
     // 나중에 이 즐겨찾기로 기록에 추가할 때도 근사치가 아니라 정확치가 이어짐
-    func addSearchResultToFavorites(_ result: FoodSearchResult) {
+    func addSearchResultToFavorites(_ result: FoodSearchResult) async {
         let category = DigestCategory.from(fatGrams: result.fat)
-        addNewFavorite(FavoriteFood(name: result.name, calorie: result.calorie ?? 0, digestCategory: category, isTrigger: false, fatGrams: result.fat))
+        await addNewFavorite(FavoriteFood(name: result.name, calorie: result.calorie ?? 0, digestCategory: category, isTrigger: false, fatGrams: result.fat))
     }
 
     func performAutoMatch() async {
@@ -187,9 +203,9 @@ final class FoodPickerModel: ObservableObject {
         }
     }
 
-    func addAutoMatchToFavorites(_ result: FoodAutoMatchResult) {
+    func addAutoMatchToFavorites(_ result: FoodAutoMatchResult) async {
         guard let calorie = result.estimatedServingCalorie else { return }
         let category = DigestCategory.from(fatGrams: result.estimatedServingFatGrams)
-        addNewFavorite(FavoriteFood(name: result.name, calorie: calorie, digestCategory: category, isTrigger: false, fatGrams: result.estimatedServingFatGrams))
+        await addNewFavorite(FavoriteFood(name: result.name, calorie: calorie, digestCategory: category, isTrigger: false, fatGrams: result.estimatedServingFatGrams))
     }
 }

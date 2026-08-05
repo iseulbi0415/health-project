@@ -2,7 +2,9 @@
 //  FavoriteFood.swift
 //  HealthProject
 //
-//  즐겨찾기(자주 먹는 음식) — 웹처럼 백엔드에 저장하지 않고 기기에만 저장하는 로컬 전용 모델
+//  즐겨찾기(자주 먹는 음식) — 서버 DB(Favorite 엔티티, user_id로 구분)에 저장됨.
+//  원래는 기기 UserDefaults에만 저장하는 로컬 전용 모델이었으나, 계정 전환 시 이전 계정
+//  즐겨찾기가 그대로 보이는 문제가 있어 Food/Run/Memo와 동일하게 서버 저장으로 전환함
 //
 
 import Foundation
@@ -68,7 +70,9 @@ enum Meal: String, CaseIterable, Identifiable, Codable {
 }
 
 struct FavoriteFood: Codable, Identifiable {
-    let id: UUID
+    // 서버(Favorite 엔티티)가 발급하는 id. 0은 "아직 서버에 없음"(생성 전) placeholder일 뿐이고,
+    // 생성 요청 바디엔 안 실림(FavoriteAPIService 참고) — 응답으로 받은 실제 id로 교체됨
+    let id: Int
     var name: String
     var calorie: Int
     var digestCategory: DigestCategory
@@ -76,7 +80,7 @@ struct FavoriteFood: Codable, Identifiable {
     // 2부(식약처 검색) 대비용 필드 — 1부에서는 항상 nil
     var fatGrams: Double?
 
-    init(id: UUID = UUID(), name: String, calorie: Int, digestCategory: DigestCategory, isTrigger: Bool, fatGrams: Double? = nil) {
+    init(id: Int = 0, name: String, calorie: Int, digestCategory: DigestCategory, isTrigger: Bool, fatGrams: Double? = nil) {
         self.id = id
         self.name = name
         self.calorie = calorie

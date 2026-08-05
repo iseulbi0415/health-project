@@ -50,7 +50,7 @@ struct FoodPickerView: View {
                 }
             }
             .task {
-                foodPicker.loadFavorites()
+                await foodPicker.loadFavorites()
             }
         }
     }

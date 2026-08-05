@@ -104,7 +104,7 @@ struct FoodPickerSections: View {
                     // allowsFullSwipe: true — 끝까지 밀면 확인 없이 바로 삭제(메일 앱과 동일한 iOS 표준 동작)
                     .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                         Button("삭제", role: .destructive) {
-                            model.deleteFavorite(favorite)
+                            Task { await model.deleteFavorite(favorite) }
                         }
                     }
                     .swipeActions(edge: .leading) {
@@ -113,7 +113,7 @@ struct FoodPickerSections: View {
                     }
                     .contextMenu {
                         Button("수정") { editingFavorite = favorite }
-                        Button("삭제", role: .destructive) { model.deleteFavorite(favorite) }
+                        Button("삭제", role: .destructive) { Task { await model.deleteFavorite(favorite) } }
                     }
                 }
             }
@@ -125,12 +125,12 @@ struct FoodPickerSections: View {
         }
         .sheet(item: $fallbackTarget) { target in
             FavoriteAddView(initialName: target.name, onSave: { favorite in
-                model.addNewFavorite(favorite)
+                Task { await model.addNewFavorite(favorite) }
             })
         }
         .sheet(item: $editingFavorite) { favorite in
             FavoriteAddView(existingFavorite: favorite, onSave: { updated in
-                model.updateFavorite(updated)
+                Task { await model.updateFavorite(updated) }
             })
         }
     }
@@ -219,7 +219,7 @@ struct FoodPickerSections: View {
                 // 자체가 실패한 값이면, 부정확한 값을 영구 저장하는 걸 막기 위해 즐겨찾기 등록 버튼을 숨김
                 if result.matchType != "fallback" && !result.isServingEstimateFallback {
                     Button("즐겨찾기 등록") {
-                        model.addAutoMatchToFavorites(result)
+                        Task { await model.addAutoMatchToFavorites(result) }
                     }
                     .buttonStyle(.glass)
                 }
@@ -311,7 +311,7 @@ struct FoodPickerSections: View {
                     }
                     .buttonStyle(.bordered)
                     Button("즐겨찾기") {
-                        model.addSearchResultToFavorites(result)
+                        Task { await model.addSearchResultToFavorites(result) }
                     }
                     .buttonStyle(.bordered)
                 }

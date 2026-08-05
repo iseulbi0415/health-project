@@ -189,7 +189,7 @@ struct DietTimerView: View {
             .listStyle(.insetGrouped)
             .sheet(isPresented: $isShowingAddFavoriteSheet) {
                 FavoriteAddView(onSave: { favorite in
-                    foodPicker.addNewFavorite(favorite)
+                    Task { await foodPicker.addNewFavorite(favorite) }
                 })
             }
             // 검색 전용 시트 — 평소 화면엔 검색창을 안 두고, 돋보기 버튼을 눌렀을 때만
@@ -216,7 +216,7 @@ struct DietTimerView: View {
                 await loadTodayFoods()
             }
             .task {
-                foodPicker.loadFavorites()
+                await foodPicker.loadFavorites()
                 await loadTodayFoods()
                 let currentMonth = Calendar.current.dateComponents([.year, .month], from: Date())
                 if let year = currentMonth.year, let month = currentMonth.month {

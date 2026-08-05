@@ -92,7 +92,7 @@ struct FavoriteAddView: View {
         }
 
         onSave(FavoriteFood(
-            id: existingFavorite?.id ?? UUID(),
+            id: existingFavorite?.id ?? 0,
             name: name,
             calorie: calorie,
             digestCategory: digestCategory,
