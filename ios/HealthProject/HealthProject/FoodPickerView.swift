@@ -15,6 +15,8 @@ struct FoodPickerView: View {
     @Environment(\.dismiss) private var dismiss
     @StateObject private var foodPicker = FoodPickerModel()
     @State private var selectedMeal: Meal = .breakfast
+    // FoodPickerSections에 Binding으로 넘김 — 이유는 FoodPickerSections.swift 주석 참고
+    @State private var editingFavorite: FavoriteFood?
 
     // 웹의 dateWithCurrentTime과 동일 — 선택된 날짜에 지금 시:분:초를 붙여 LocalDateTime 문자열을 만듦
     private var recordedAtValue: String {
@@ -35,7 +37,7 @@ struct FoodPickerView: View {
 
                 FoodPickerSections(model: foodPicker, selectedMeal: selectedMeal, recordedAt: recordedAtValue, onAdded: {
                     onAdded()
-                })
+                }, editingFavorite: $editingFavorite)
             }
             .navigationTitle("\(date) 음식 추가")
             // placement 없으면(.automatic) 검색창이 화면 하단 쪽에 배치돼서, nav bar 바로 아래
@@ -48,6 +50,11 @@ struct FoodPickerView: View {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("닫기") { dismiss() }
                 }
+            }
+            .sheet(item: $editingFavorite) { favorite in
+                FavoriteAddView(existingFavorite: favorite, onSave: { updated in
+                    Task { await foodPicker.updateFavorite(updated) }
+                })
             }
             .task {
                 await foodPicker.loadFavorites()

@@ -14,15 +14,22 @@ struct FoodSearchSheetView: View {
     let onAdded: () async -> Void
 
     @Environment(\.dismiss) private var dismiss
+    // FoodPickerSections에 Binding으로 넘김 — 이유는 FoodPickerSections.swift 주석 참고
+    @State private var editingFavorite: FavoriteFood?
 
     var body: some View {
         NavigationStack {
             List {
                 FoodPickerSections(model: model, selectedMeal: selectedMeal, recordedAt: nil, onAdded: {
                     await onAdded()
-                }, favoritesSectionTitle: "빠르게 추가하기")
+                }, editingFavorite: $editingFavorite, favoritesSectionTitle: "빠르게 추가하기")
             }
             .listStyle(.insetGrouped)
+            .sheet(item: $editingFavorite) { favorite in
+                FavoriteAddView(existingFavorite: favorite, onSave: { updated in
+                    Task { await model.updateFavorite(updated) }
+                })
+            }
             // placement 없으면(.automatic) 검색창이 화면 하단 쪽에 배치돼서, 설정/메시지 앱처럼
             // nav bar 바로 아래 항상 고정되도록 명시
             .searchable(text: $model.searchQuery, placement: .navigationBarDrawer(displayMode: .always), prompt: "음식 이름 검색")

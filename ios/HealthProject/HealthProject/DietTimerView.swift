@@ -23,6 +23,9 @@ struct DietTimerView: View {
     @State private var showActionAlert = false
     @State private var editingFood: FoodRecord?
     @State private var isShowingSearchSheet = false
+    // FoodPickerSections에 Binding으로 넘김 — List 안에 끼워지는 자식 뷰가 아니라 List를 직접
+    // 소유한 이 뷰가 상태와 .sheet를 들고 있어야 하는 이유는 FoodPickerSections.swift 주석 참고
+    @State private var editingFavorite: FavoriteFood?
 
     @State private var selectedDate = Date()
     @State private var isShowingDayDetail = false
@@ -110,7 +113,7 @@ struct DietTimerView: View {
 
                 FoodPickerSections(model: foodPicker, selectedMeal: selectedMeal, recordedAt: nil, onAdded: {
                     await loadTodayFoods()
-                })
+                }, editingFavorite: $editingFavorite)
 
                 Section("끼니") {
                     Picker("끼니", selection: $selectedMeal) {
@@ -205,6 +208,11 @@ struct DietTimerView: View {
             .sheet(item: $editingFood) { food in
                 FoodRecordEditView(food: food, onSaved: {
                     Task { await loadTodayFoods() }
+                })
+            }
+            .sheet(item: $editingFavorite) { favorite in
+                FavoriteAddView(existingFavorite: favorite, onSave: { updated in
+                    Task { await foodPicker.updateFavorite(updated) }
                 })
             }
             .alert("확인해주세요", isPresented: $showActionAlert) {

@@ -13,6 +13,14 @@ struct FoodPickerSections: View {
     let selectedMeal: Meal
     let recordedAt: String?
     let onAdded: () async -> Void
+    // 즐겨찾기 스와이프/컨텍스트 메뉴 "수정"에서 열리는 편집 시트 대상 — 예전엔 이 뷰가 @State로
+    // 직접 들고 .sheet(item:)도 여기 붙였었는데, 앱을 새로 켠 뒤 첫 번째 시도에서만 편집 시트가
+    // 뜨자마자 닫히는 버그가 있었음(실기기 로그로 확인). 원인은 이 뷰가 List 안에 끼워 넣어지는
+    // 자식 뷰라서, List 셀이 막 안정화되는 시점에 이 안쪽 깊은 곳에서 시트를 띄우면 프레젠테이션
+    // 대상이 불안정한 것으로 보임 — "오늘 먹은 음식"(DietTimerView가 직접 소유)은 이 문제가 없었던
+    // 것과 대비됨. 그래서 상태와 .sheet를 List를 직접 들고 있는 부모(DietTimerView/FoodPickerView)로
+    // 옮기고, 이 뷰는 Binding만 받도록 변경함.
+    @Binding var editingFavorite: FavoriteFood?
     // 검색 시트에서는 "빠르게 추가하기"로 다르게 부르고 싶어서 파라미터화 — 기존 호출부(DietTimerView/
     // FoodPickerView)는 인자 없이 그대로 컴파일되도록 기본값을 "즐겨찾기"로 둠
     var favoritesSectionTitle: String = "즐겨찾기"
@@ -29,8 +37,6 @@ struct FoodPickerSections: View {
         let name: String
     }
     @State private var fallbackTarget: FallbackPrefillTarget?
-    // 즐겨찾기 스와이프/컨텍스트 메뉴 "수정"에서 열리는 편집 시트 대상
-    @State private var editingFavorite: FavoriteFood?
     // 추가 버튼 탭 시 잠깐 체크마크로 바뀌는 마이크로 인터랙션용 — 토스트/화면전환 없이도
     // "확실히 추가됐다"는 느낌을 주기 위함. 즐겨찾기는 여러 행 중 방금 누른 행만 표시해야 해서 id로,
     // 검색결과 카드는 한 번에 하나뿐이라 Bool로 충분
@@ -60,9 +66,12 @@ struct FoodPickerSections: View {
                             HStack {
                                 Text(favorite.name)
                                 if favorite.isTrigger {
-                                    Label("트리거", systemImage: "exclamationmark.triangle.fill")
-                                        .font(.caption)
-                                        .foregroundStyle(Color("CalorieCoral"))
+                                    HStack(spacing: 3) {
+                                        Image(systemName: "exclamationmark.triangle.fill")
+                                        Text("트리거")
+                                    }
+                                    .font(.caption)
+                                    .foregroundStyle(Color("CalorieCoral"))
                                 }
                             }
                             Text("\(favorite.calorie) kcal · \(favorite.digestCategory.label)")
@@ -70,8 +79,39 @@ struct FoodPickerSections: View {
                                 .monospacedDigit()
                                 .foregroundStyle(.secondary)
                         }
+                        // .contextMenu는 아래 캡슐(.onTapGesture)과 겹치지 않도록 이 텍스트 영역에만 붙임
+                        // — 자세한 이유는 아래 캡슐 쪽 주석 참고.
+                        .contextMenu {
+                            Button("수정") { editingFavorite = favorite }
+                            Button("삭제", role: .destructive) { Task { await model.deleteFavorite(favorite) } }
+                        }
                         Spacer()
-                        Button {
+                        // Button 대신 .glassEffect + onTapGesture — Button의 buttonStyle(.glass) 자체
+                        // 눌림 애니메이션이 .contextMenu(롱프레스)와 경쟁하는 문제를 없애기 위함.
+                        // 단, onTapGesture도 자체 제스처 인식기를 갖고 있어서 .contextMenu와 "같은 뷰
+                        // 영역"에 두면 여전히 충돌 소지가 있음(앱을 새로 켠 직후 첫 롱프레스→수정 시
+                        // 편집 시트가 뜨자마자 닫히는 문제로 실제 재현됨) — 그래서 .contextMenu는 이
+                        // 캡슐이 아니라 아래 VStack(텍스트 영역)에만 붙여서 두 제스처 영역을 겹치지
+                        // 않게 분리함. "오늘 먹은 음식"과 1px도 다른 코드가 아니라 이 캡슐 자체가 그
+                        // 행에 없는 요소라 완전히 똑같이 만들 수는 없고, 이게 안전한 선에서 최대한
+                        // 가까운 형태임.
+                        Group {
+                            if justAddedFavoriteID == favorite.id {
+                                Image(systemName: "checkmark")
+                                    .scaleEffect(1.15)
+                                    .transition(.opacity.combined(with: .scale))
+                            } else {
+                                Text(addButtonLabel)
+                                    .transition(.opacity.combined(with: .scale))
+                            }
+                        }
+                        .frame(minWidth: 70)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 8)
+                        .glassEffect(.regular, in: Capsule())
+                        .contentShape(Capsule())
+                        .accessibilityAddTraits(.isButton)
+                        .onTapGesture {
                             Task {
                                 let success = await model.addFavoriteToRecord(favorite, meal: selectedMeal, recordedAt: recordedAt)
                                 await onAdded()
@@ -86,20 +126,7 @@ struct FoodPickerSections: View {
                                     justAddedFavoriteID = nil
                                 }
                             }
-                        } label: {
-                            Group {
-                                if justAddedFavoriteID == favorite.id {
-                                    Image(systemName: "checkmark")
-                                        .scaleEffect(1.15)
-                                        .transition(.opacity.combined(with: .scale))
-                                } else {
-                                    Text(addButtonLabel)
-                                        .transition(.opacity.combined(with: .scale))
-                                }
-                            }
-                            .frame(minWidth: 70)
                         }
-                        .buttonStyle(.glass)
                     }
                     // allowsFullSwipe: true — 끝까지 밀면 확인 없이 바로 삭제(메일 앱과 동일한 iOS 표준 동작)
                     .swipeActions(edge: .trailing, allowsFullSwipe: true) {
@@ -110,10 +137,6 @@ struct FoodPickerSections: View {
                     .swipeActions(edge: .leading) {
                         Button("수정") { editingFavorite = favorite }
                             .tint(.blue)
-                    }
-                    .contextMenu {
-                        Button("수정") { editingFavorite = favorite }
-                        Button("삭제", role: .destructive) { Task { await model.deleteFavorite(favorite) } }
                     }
                 }
             }
@@ -126,11 +149,6 @@ struct FoodPickerSections: View {
         .sheet(item: $fallbackTarget) { target in
             FavoriteAddView(initialName: target.name, onSave: { favorite in
                 Task { await model.addNewFavorite(favorite) }
-            })
-        }
-        .sheet(item: $editingFavorite) { favorite in
-            FavoriteAddView(existingFavorite: favorite, onSave: { updated in
-                Task { await model.updateFavorite(updated) }
             })
         }
     }
