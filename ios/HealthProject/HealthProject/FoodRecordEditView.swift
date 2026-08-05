@@ -72,7 +72,12 @@ struct FoodRecordEditView: View {
                 }
 
                 Section {
-                    Toggle("⚠️ 트리거 음식(역류 유발 가능)", isOn: $isTrigger)
+                    // 트리거/경고 계열 색은 CalorieCoral로 통일 — FavoriteAddView와 동일
+                    Toggle(isOn: $isTrigger) {
+                        Label("트리거 음식(역류 유발 가능)", systemImage: "exclamationmark.triangle.fill")
+                            .foregroundStyle(Color("CalorieCoral"))
+                    }
+                    .tint(Color("CalorieCoral"))
                 }
             }
             .navigationTitle("기록 수정")
