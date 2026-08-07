@@ -176,6 +176,26 @@ struct ProfileView: View {
                     .foregroundStyle(.secondary)
                     .disabled(isDeletingAccount)
                 }
+
+                // App Store Review Guidelines 1.4.1 대응(의료 관련 앱 면책 문구 + 개인정보
+                // 처리방침 링크). 시선을 끌면 안 되는 영역이라 카드 배경 없이 텍스트만 두고,
+                // 링크도 기본 파란색 대신 회색 계열로 눌러서 화면에서 튀지 않게 함
+                Section {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Link("개인정보 처리방침",
+                             destination: URL(string: "https://iseulbi0415.github.io/health-project/privacy.html")!)
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+
+                        Text("소담은 의료기기가 아니며 질병의 진단·치료·예방을 목적으로 하지 않습니다. 제공되는 대기 시간은 참고값이며, 증상이 지속되면 의료 전문가와 상담하세요.")
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                            .lineSpacing(4)
+                    }
+                    .padding(.top, 24)
+                    .listRowBackground(Color.clear)
+                    .listRowInsets(EdgeInsets(top: 0, leading: 20, bottom: 12, trailing: 20))
+                }
             }
             // confirmationDialog는 이 환경 시뮬레이터에서 팝오버 형태로 뜨면서 취소 버튼이 안
             // 보이는 렌더링 이슈가 있어서(실기기에서도 재현 확인됨), 항상 화면 중앙 박스로
