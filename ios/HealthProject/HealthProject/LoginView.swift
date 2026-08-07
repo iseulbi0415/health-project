@@ -143,7 +143,13 @@ struct LoginView: View {
                 }
             }
         case .failure(let error):
-            errorMessage = "로그인 실패: \(error.localizedDescription)"
+            // 코드 1001(canceled)은 사용자가 로그인 시트를 직접 닫은 경우라 에러가 아님 — .unknown도
+            // 시트를 닫을 때 종종 같이 발생해서(실기기 확인) 함께 무시. 둘 다 메시지를 띄우지 않음
+            if let authError = error as? ASAuthorizationError,
+               authError.code == .canceled || authError.code == .unknown {
+                return
+            }
+            errorMessage = "로그인에 실패했습니다. 다시 시도해 주세요."
         }
     }
 }

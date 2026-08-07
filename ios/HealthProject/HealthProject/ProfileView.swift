@@ -190,7 +190,7 @@ struct ProfileView: View {
                 Button("취소", role: .cancel) {}
             }
             .alert(
-                "계정과 모든 기록이 삭제되며 복구할 수 없습니다.",
+                "계정과 모든 기록이 삭제되며 복구할 수 없습니다. 탈퇴 후 자동으로 로그아웃됩니다.",
                 isPresented: $showDeleteAccountConfirmation
             ) {
                 Button("탈퇴", role: .destructive) {
