@@ -31,23 +31,23 @@ struct DietTimerView: View {
     @State private var isShowingDayDetail = false
     @State private var markedDates: Set<String> = []
     @State private var isShowingCalendar = false
+    // 달력에 현재 보이는 달 — DayDetailView에서 기록이 바뀌었을 때 어느 달의 점 표시를
+    // 다시 불러와야 하는지 알기 위해 저장해둠(onVisibleMonthChange에서 갱신됨)
+    @State private var visibleYear = Calendar.current.component(.year, from: Date())
+    @State private var visibleMonth = Calendar.current.component(.month, from: Date())
 
     private var totalCalories: Int {
         todayFoods.reduce(0) { $0 + $1.calorie }
     }
 
-    // 아침→점심→저녁→간식(Meal.allCases 순서) 기준으로 정렬 — 서버가 등록 순서 그대로 내려주는 것과 무관하게
-    // 화면에서는 항상 끼니 시간 순서로 보이게 함
-    private var sortedTodayFoods: [FoodRecord] {
-        todayFoods.sorted { mealSortIndex(for: $0.meal) < mealSortIndex(for: $1.meal) }
-    }
-
-    private func mealSortIndex(for rawValue: String?) -> Int {
-        guard let rawValue, let meal = Meal(rawValue: rawValue),
-              let index = Meal.allCases.firstIndex(of: meal) else {
-            return Meal.allCases.count
+    // 아침→점심→저녁→간식(Meal.allCases 순서) 고정 — 끼니 헤더로 묶어서 표시하기 위한 그룹화.
+    // 서버가 등록 순서 그대로 내려주는 것과 무관하게 항상 끼니 시간 순서로 보이게 함.
+    // 음식이 하나도 없는 끼니는 배열에서 아예 빠져서 헤더 자체가 안 보임
+    private var groupedTodayFoods: [(meal: Meal, foods: [FoodRecord])] {
+        Meal.allCases.compactMap { meal in
+            let foods = todayFoods.filter { $0.meal == meal.rawValue }
+            return foods.isEmpty ? nil : (meal, foods)
         }
-        return index
     }
 
     var body: some View {
@@ -100,11 +100,14 @@ struct DietTimerView: View {
                         // onVisibleMonthChange가 그 달 요약만 새로 불러옴(날짜별 개별 호출 아님)
                         CalendarView(
                             markedDateStrings: markedDates,
+                            isDayDetailPresented: isShowingDayDetail,
                             onSelectDate: { date in
                                 selectedDate = date
                                 isShowingDayDetail = true
                             },
                             onVisibleMonthChange: { year, month in
+                                visibleYear = year
+                                visibleMonth = month
                                 Task { await loadMonthSummary(year: year, month: month) }
                             }
                         )
@@ -133,38 +136,40 @@ struct DietTimerView: View {
                         Text("오늘 먹은 음식이 없습니다.")
                             .foregroundStyle(.secondary)
                     } else {
-                        ForEach(sortedTodayFoods) { food in
-                            HStack {
-                                VStack(alignment: .leading, spacing: 2) {
-                                    HStack {
-                                        Text(food.quantity > 1 ? "\(food.name) ×\(food.quantity)" : food.name)
-                                        if food.isTrigger {
-                                            Label("트리거", systemImage: "exclamationmark.triangle.fill")
-                                                .font(.caption)
-                                                .foregroundStyle(Color("CalorieCoral"))
-                                        }
+                        // 끼니를 그룹 헤더로 올리고 그 아래 음식을 묶어서 표시 — 헤더로 이미
+                        // 끼니가 드러나므로 각 행에 있던 끼니 표시(footnote)는 제거함
+                        ForEach(groupedTodayFoods, id: \.meal) { group in
+                            Text(group.meal.label)
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                                .padding(.top, 6)
+
+                            ForEach(group.foods) { food in
+                                HStack {
+                                    Text(food.quantity > 1 ? "\(food.name) ×\(food.quantity)" : food.name)
+                                    if food.isTrigger {
+                                        Label("트리거", systemImage: "exclamationmark.triangle.fill")
+                                            .font(.caption)
+                                            .foregroundStyle(Color("CalorieCoral"))
                                     }
-                                    Text(mealLabel(for: food.meal))
-                                        .font(.footnote)
-                                        .foregroundStyle(.secondary)
+                                    Spacer()
+                                    Text("\(food.calorie) kcal")
+                                        .monospacedDigit()
                                 }
-                                Spacer()
-                                Text("\(food.calorie) kcal")
-                                    .monospacedDigit()
-                            }
-                            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                                Button("삭제", role: .destructive) {
-                                    Task { await deleteFood(food) }
+                                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                    Button("삭제", role: .destructive) {
+                                        Task { await deleteFood(food) }
+                                    }
                                 }
-                            }
-                            .swipeActions(edge: .leading) {
-                                Button("수정") { editingFood = food }
-                                    .tint(.blue)
-                            }
-                            .contextMenu {
-                                Button("수정") { editingFood = food }
-                                Button("삭제", role: .destructive) {
-                                    Task { await deleteFood(food) }
+                                .swipeActions(edge: .leading) {
+                                    Button("수정") { editingFood = food }
+                                        .tint(.blue)
+                                }
+                                .contextMenu {
+                                    Button("수정") { editingFood = food }
+                                    Button("삭제", role: .destructive) {
+                                        Task { await deleteFood(food) }
+                                    }
                                 }
                             }
                         }
@@ -203,7 +208,9 @@ struct DietTimerView: View {
                 })
             }
             .sheet(isPresented: $isShowingDayDetail) {
-                DayDetailView(date: dayDetailDateString())
+                DayDetailView(date: dayDetailDateString(), onDataChanged: {
+                    Task { await loadMonthSummary(year: visibleYear, month: visibleMonth) }
+                })
             }
             .sheet(item: $editingFood) { food in
                 FoodRecordEditView(food: food, onSaved: {
@@ -231,11 +238,6 @@ struct DietTimerView: View {
                     await loadMonthSummary(year: year, month: month)
                 }
             }
-    }
-
-    private func mealLabel(for rawValue: String?) -> String {
-        guard let rawValue, let meal = Meal(rawValue: rawValue) else { return "" }
-        return meal.label
     }
 
     private func deleteFood(_ food: FoodRecord) async {

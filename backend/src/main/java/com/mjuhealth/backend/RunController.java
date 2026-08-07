@@ -52,10 +52,10 @@ public class RunController {
     public List<Run> getAllRuns(@RequestParam(required = false) String date, @AuthenticationPrincipal KakaoOAuth2User principal) {
         if (date != null) {
             LocalDate day = LocalDate.parse(date);
-            return runRepository.findByUserIdAndRecordedAtGreaterThanEqualAndRecordedAtLessThan(
+            return runRepository.findByUserIdAndRecordedAtGreaterThanEqualAndRecordedAtLessThanOrderByRecordedAtDesc(
                     principal.getInternalUserId(), day.atStartOfDay(), day.plusDays(1).atStartOfDay());
         }
-        return runRepository.findByUserId(principal.getInternalUserId());
+        return runRepository.findByUserIdOrderByRecordedAtDesc(principal.getInternalUserId());
     }
 
     @PutMapping(value = "/{id}", produces = "application/json;charset=UTF-8")

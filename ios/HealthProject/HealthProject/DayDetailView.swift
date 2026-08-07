@@ -9,6 +9,10 @@ import SwiftUI
 
 struct DayDetailView: View {
     let date: String   // "yyyy-MM-dd"
+    // 이 날짜의 식단/러닝/메모가 추가·수정·삭제될 때마다 호출 — 부모(DietTimerView)가 달력 점
+    // 표시(markedDates)를 다시 불러오게 함. loadDayDetail()이 끝날 때마다 한 번씩 불러서
+    // 어느 종류(식단/러닝/메모)를 바꾸든 빠짐없이 반영되게 함
+    var onDataChanged: () -> Void = {}
 
     // 타이틀에 요일을 작게 덧붙임 — "2026-07-21 (화)"
     private var dateWithWeekday: String {
@@ -24,6 +28,20 @@ struct DayDetailView: View {
     @State private var foods: [FoodRecord] = []
     @State private var runs: [RunRecord] = []
     @State private var memos: [MemoRecord] = []
+
+    // 아침→점심→저녁→간식 고정 순서로 표시(DietTimerView.groupedTodayFoods와 동일한 규칙) —
+    // 서버는 recordedAt 순으로만 내려주므로 끼니 순서는 여기서 별도로 맞춤
+    private var sortedFoods: [FoodRecord] {
+        foods.sorted { mealSortIndex(for: $0.meal) < mealSortIndex(for: $1.meal) }
+    }
+
+    private func mealSortIndex(for rawValue: String?) -> Int {
+        guard let rawValue, let meal = Meal(rawValue: rawValue),
+              let index = Meal.allCases.firstIndex(of: meal) else {
+            return Meal.allCases.count
+        }
+        return index
+    }
     @State private var isLoading = false
     @State private var errorMessage: String?
 
@@ -53,7 +71,7 @@ struct DayDetailView: View {
                     if foods.isEmpty {
                         Text("기록 없음").foregroundStyle(.secondary)
                     } else {
-                        ForEach(foods) { food in
+                        ForEach(sortedFoods) { food in
                             HStack {
                                 Text(food.quantity > 1 ? "\(food.name) ×\(food.quantity)" : food.name)
                                 Spacer()
@@ -231,6 +249,7 @@ struct DayDetailView: View {
             errorMessage = "불러오기 실패: \(error.localizedDescription)"
         }
         isLoading = false
+        onDataChanged()
     }
 
     private func deleteFood(_ food: FoodRecord) async {

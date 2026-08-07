@@ -28,7 +28,7 @@ public class MemoController {
         if (date != null) {
             return memoRepository.findByUserIdAndDate(principal.getInternalUserId(), date);
         }
-        return memoRepository.findByUserId(principal.getInternalUserId());
+        return memoRepository.findByUserIdOrderByDateDesc(principal.getInternalUserId());
     }
 
     @PutMapping(value = "/{id}", produces = "application/json;charset=UTF-8")

@@ -187,10 +187,11 @@ struct HomeView: View {
         do {
             todayFoods = try await foodsResult
             let runs = try await runsResult
-            // 백엔드가 정렬을 보장하지 않아서, id가 클수록 최근에 저장된 것이라고 보고 직접 정렬
-            // (ProfileView.loadRecentMemos()의 메모 정렬 컨벤션을 러닝에도 적용 — 웹은 배열 마지막
-            // 요소를 쓰지만 결과는 사실상 동일)
-            recentRun = runs.max(by: { $0.id < $1.id })
+            // 백엔드가 GET /api/runs를 recordedAt 내림차순으로 내려주므로 첫 번째가 최신 기록.
+            // 예전엔 id(삽입 순서)가 클수록 최근이라고 보고 직접 정렬했는데, 달력에서 과거
+            // 날짜로 기록을 추가하면 id는 크지만 recordedAt은 과거라 최근 기록으로 잘못
+            // 표시되는 버그가 있었음
+            recentRun = runs.first
         } catch {
             errorMessage = "불러오기 실패: \(error.localizedDescription)"
         }
