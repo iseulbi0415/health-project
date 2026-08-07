@@ -3,6 +3,7 @@ package com.mjuhealth.backend;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -40,7 +41,11 @@ public class SecurityConfig {
             .csrf(csrf -> csrf.disable())
             .cors(Customizer.withDefaults())
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers(mvc.matcher("/api/auth/me")).permitAll()
+                // GET만 permitAll — DELETE(회원 탈퇴, AccountDeletionService)까지 여기 걸리면
+                // 인증 없이 필터체인을 통과해버림(컨트롤러 안 null 체크로 막긴 하지만 permitAll 범위
+                // 자체가 틀린 것). 메서드를 지정 안 하면 모든 메서드에 적용되므로 GET으로 한정하고,
+                // DELETE는 아래 apiMatcher.authenticated()에 자연히 걸리게 함
+                .requestMatchers(mvc.matcher(HttpMethod.GET, "/api/auth/me")).permitAll()
                 // 네이티브 앱 카카오 로그인 진입점(NativeKakaoAuthController) — 로그인 전 상태에서 호출되므로 인증 예외
                 // (다른 웹 로그인 관련 설정(oauth2Login/logout/CORS)은 이 기능을 위해 변경하지 않음)
                 .requestMatchers(mvc.matcher("/api/auth/kakao/native")).permitAll()

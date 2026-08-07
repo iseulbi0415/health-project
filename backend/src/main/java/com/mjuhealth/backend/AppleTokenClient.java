@@ -33,6 +33,7 @@ import java.util.Optional;
 public class AppleTokenClient {
 
     private static final String TOKEN_URL = "https://appleid.apple.com/auth/token";
+    private static final String REVOKE_URL = "https://appleid.apple.com/auth/revoke";
     private static final String APPLE_AUDIENCE = "https://appleid.apple.com";
     // client_secret JWT는 호출마다 새로 만들어 쓰는 단기 토큰이라 유효기간을 길게 둘 이유가 없음
     private static final long CLIENT_SECRET_TTL_SECONDS = 300;
@@ -119,5 +120,24 @@ public class AppleTokenClient {
             log.warn("Apple authorizationCode -> refresh_token 교환 실패(로그인 자체는 계속 진행됨)", e);
             return Optional.empty();
         }
+    }
+
+    // 회원 탈퇴 전용 — exchangeAuthorizationCode와 달리 실패를 여기서 삼키지 않고 그대로 던짐.
+    // 호출자(AccountDeletionService)가 userId 등 삭제 컨텍스트를 포함해 로그를 남기고,
+    // 로컬 계정 삭제는 이 호출 결과와 무관하게 계속 진행하도록 설계돼 있음
+    public void revokeRefreshToken(String refreshToken) throws JOSEException {
+        String clientSecret = generateClientSecret();
+        MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
+        form.add("token", refreshToken);
+        form.add("token_type_hint", "refresh_token");
+        form.add("client_id", bundleId);
+        form.add("client_secret", clientSecret);
+
+        restClient.post()
+                .uri(REVOKE_URL)
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                .body(form)
+                .retrieve()
+                .toBodilessEntity();
     }
 }

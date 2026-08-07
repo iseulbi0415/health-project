@@ -34,6 +34,10 @@ struct ProfileView: View {
     @State private var isMemoListExpanded = false
     // 실수로 로그아웃 버튼을 누르는 걸 방지하기 위한 확인 절차
     @State private var showLogoutConfirmation = false
+    // 회원 탈퇴 — 로그아웃보다 훨씬 되돌릴 수 없는 동작이라 확인/에러 알럿을 따로 둠
+    @State private var showDeleteAccountConfirmation = false
+    @State private var isDeletingAccount = false
+    @State private var showDeleteAccountError = false
 
     // 캐시된 결과 문자열 대신 저장된 값에서 매번 다시 계산 — 시트에서 값이 바뀌어도 별도 동기화 없이
     // 항상 최신 상태를 보여줌(단일 소스: heightText/weightText/ageText/gender/activityLevel)
@@ -161,6 +165,16 @@ struct ProfileView: View {
                     Button("로그아웃", role: .destructive) {
                         showLogoutConfirmation = true
                     }
+
+                    // 로그아웃보다 되돌릴 수 없는 동작이지만, 자주 누를 버튼이 아니라서 오히려
+                    // 로그아웃(destructive 빨간 버튼)보다 덜 눈에 띄게 둠 — 실수로 누를 위험은
+                    // 아래 확인 알럿으로 방지
+                    Button("회원 탈퇴") {
+                        showDeleteAccountConfirmation = true
+                    }
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .disabled(isDeletingAccount)
                 }
             }
             // confirmationDialog는 이 환경 시뮬레이터에서 팝오버 형태로 뜨면서 취소 버튼이 안
@@ -174,6 +188,20 @@ struct ProfileView: View {
                     authManager.logout()
                 }
                 Button("취소", role: .cancel) {}
+            }
+            .alert(
+                "계정과 모든 기록이 삭제되며 복구할 수 없습니다.",
+                isPresented: $showDeleteAccountConfirmation
+            ) {
+                Button("탈퇴", role: .destructive) {
+                    Task { await deleteAccount() }
+                }
+                Button("취소", role: .cancel) {}
+            }
+            .alert("회원 탈퇴 실패", isPresented: $showDeleteAccountError) {
+                Button("확인", role: .cancel) {}
+            } message: {
+                Text("잠시 후 다시 시도해주세요.")
             }
             .sheet(isPresented: $isShowingBMRSheet) {
                 BMRInputView(
@@ -291,6 +319,21 @@ struct ProfileView: View {
             hasCalculatedGoal: true
         )
         try? await UserProfileAPIService.updateProfile(profile)
+    }
+
+    // 성공하면 authManager.logout()으로 로컬 상태 초기화 → isLoggedIn 플래그가 내려가며
+    // HealthProjectApp의 분기에 따라 자동으로 LoginView로 전환됨(별도 네비게이션 코드 불필요).
+    // 실패하면 로그인 상태를 그대로 두고 에러 알럿만 띄움 — 탈퇴 실패로 로그아웃되면 안 됨
+    private func deleteAccount() async {
+        isDeletingAccount = true
+        do {
+            try await AuthAPIService.deleteAccount()
+            isDeletingAccount = false
+            authManager.logout()
+        } catch {
+            isDeletingAccount = false
+            showDeleteAccountError = true
+        }
     }
 
     private func deleteMemo(_ memo: MemoRecord) async {

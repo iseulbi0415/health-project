@@ -23,6 +23,10 @@ final class AuthManager: ObservableObject {
     }
 
     func logout() {
+        // fire-and-forget으로 백엔드 세션도 무효화 — 예전엔 이 호출이 없어서 서버 세션(JSESSIONID)이
+        // 로그아웃 후에도 살아있었음(2026-08-08 확인). logout() 자체는 계속 동기 함수로 남겨서
+        // 다른 호출부(ProfileView 등)를 수정할 필요 없게 함
+        Task { await AuthAPIService.logout() }
         UserDefaults.standard.set(false, forKey: "isLoggedIn")
         isLoggedIn = false
         // 소화 타이머는 서버 저장 없이 기기 UserDefaults에만 남는 로컬 상태라, 계정을

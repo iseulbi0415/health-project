@@ -15,4 +15,7 @@ public interface FoodRepository extends JpaRepository<Food, Long>{
     // 같은 날짜·같은 끼니·같은 이름의 기존 기록을 찾아 중복 추가 시 합치기 위한 조회 (FoodController.createFood 참고)
     Optional<Food> findByUserIdAndNameAndMealAndRecordedAtGreaterThanEqualAndRecordedAtLessThan(
             Long userId, String name, String meal, LocalDateTime start, LocalDateTime end);
+
+    // 회원 탈퇴 시 User 삭제 전에 먼저 지워야 함(FK 제약) — AccountDeletionService 참고
+    void deleteByUserId(Long userId);
 }
