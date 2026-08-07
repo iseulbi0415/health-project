@@ -124,8 +124,10 @@ health-project-submit/
 그램수 추정에 3회 병렬 호출 후 중앙값을 쓰는 것은 **자기일관성(self-consistency)**
 기법으로, 단일 호출의 편차를 줄이기 위한 것입니다.
 
-완전일치 후보 중 가공식품 비율이 **80% 이상**인 표준화 제품(라면, 과자 등)은 실제
-제품의 1회 제공량을 웹 검색으로 확인하는 별도 경로를 탑니다.
+완전일치 후보 중 가공식품 비율이 **80% 이상**인 표준화 제품(라면, 과자 등)은 포장에
+표기된 1회 제공량이 존재하므로, **Claude API의 웹 검색 도구**로 실제 제품 정보를
+조회한 뒤 그 결과를 근거로 1인분 그램수를 추정하는 별도 경로를 탑니다.
+(웹 검색 → 그램수 추정을 2단계로 강제 호출하는 구조)
 
 ### 3. 그 외 기능
 
@@ -151,7 +153,8 @@ health-project-submit/
 | 데이터베이스 | MySQL |
 | 인증 | Spring Security OAuth2 Client (카카오), OAuth2 Resource Server (Apple identity token 검증) |
 | 외부 API | 식품의약품안전처 식품영양성분DB, Anthropic Claude API (Claude Haiku 4.5) |
-| iOS 라이브러리 | Alamofire 5.12.0, Kakao iOS SDK 2.28.0, AuthenticationServices |
+| iOS 외부 라이브러리 | Alamofire 5.12.0, Kakao iOS SDK 2.28.0 (Swift Package Manager) |
+| iOS 기본 프레임워크 | SwiftUI, AuthenticationServices (Sign in with Apple) |
 | 배포 | Railway (백엔드 + MySQL) |
 
 ---
@@ -239,7 +242,13 @@ cp src/main/resources/application-secret.properties.example \
 
 - 유지 칼로리(TDEE) = BMR × 활동계수
   (거의 안 움직임 1.2 / 가벼운 활동 1.375 / 보통 활동 1.55 / 활발한 활동 1.725)
-- 증량 목표 = TDEE + 400 kcal (일반적으로 권장되는 300~500 kcal 범위 내)
+- 증량 목표 = TDEE + 400 kcal
+
+체중 0.5kg 증가에는 약 3,500 kcal의 잉여 열량이 필요하며, 국내 의료기관에서는
+증량 시 하루 500 kcal 내외를 추가하도록 안내합니다. 본 앱은 이보다 보수적인
+400 kcal를 적용해 **주당 약 0.4kg의 완만한 증가**를 목표로 합니다. 급격한 섭취량
+증가는 소화불량과 복부 팽만을 유발할 수 있어, 역류성 식도염 케어 앱의 성격상
+완만한 쪽을 택했습니다.
 
 ### 러닝 소모 칼로리 — `RunAPIService.swift`
 
@@ -309,12 +318,18 @@ cp src/main/resources/application-secret.properties.example \
    Diagnosis and Management of Gastroesophageal Reflux Disease.
    *Am J Gastroenterol.* 2022;117(1):27-56. doi:10.14309/ajg.0000000000001538
 5. Newberry C, Lynch K. The role of diet in the development and management of
-   gastroesophageal reflux disease. *J Thorac Dis.* 2019;11(S12):S1594-S1601.
+   gastroesophageal reflux disease: why we feel the burn. *J Thorac Dis.*
+   2019;11(Suppl 12):S1594-S1601. doi:10.21037/jtd.2019.06.42
 6. 보건복지부·한국영양학회. 2025 한국인 영양소 섭취기준. 세종; 2025.
 7. 송수진, 심재은. 우리나라 성인의 총 지방 및 지방산 섭취량 평가: 2016–2017년
-   국민건강영양조사. *Korean J Community Nutrition.* 2019;24(3):223-231.
-8. Herrmann SD, Willis EA, Ainsworth BE, et al. 2024 Adult Compendium of Physical
+   국민건강영양조사 자료를 활용하여. *Korean J Community Nutrition.*
+   2019;24(3):223-231. doi:10.5720/kjcn.2019.24.3.223
+8. Mifflin MD, St Jeor ST, Hill LA, Scott BJ, Daugherty SA, Koh YO. A new predictive
+   equation for resting energy expenditure in healthy individuals.
+   *Am J Clin Nutr.* 1990;51(2):241-247.
+9. Herrmann SD, Willis EA, Ainsworth BE, et al. 2024 Adult Compendium of Physical
    Activities. https://pacompendium.com/running/
+10. 삼성서울병원 건강정보. 체중을 늘리고 싶은데, 얼마만큼 먹어야 할까요?
 
 ---
 
@@ -351,6 +366,36 @@ cp src/main/resources/application-secret.properties.example \
 
 현재 세션 기반 인증을 사용하며, 서버 재시작 시 세션이 초기화됩니다.
 토큰 기반 인증으로의 전환은 향후 과제로 관리하고 있습니다.
+
+### 계정 삭제 기능 미구현
+
+현재 로그아웃만 제공하며, 계정 삭제(회원 탈퇴) 기능은 구현하지 않았습니다.
+App Store Review Guidelines 5.1.1(v)는 계정 생성을 지원하는 앱에 앱 내 계정 삭제
+경로를 요구하므로, 앱스토어 배포 전 반드시 구현해야 하는 항목으로 관리하고 있습니다.
+
+구현 시에는 계정과 함께 해당 사용자의 식단·러닝·메모·즐겨찾기 기록을 모두 삭제하도록
+설계할 예정입니다.
+
+---
+
+## 수집하는 정보
+
+본 앱은 건강 관련 정보를 다루므로 수집 항목을 아래와 같이 제한했습니다.
+
+| 구분 | 항목 | 용도 |
+|---|---|---|
+| 계정 | 카카오 회원번호 또는 Apple 사용자 식별자, 닉네임 | 로그인 및 사용자 구분 |
+| 신체 정보 | 키, 체중, 나이, 성별, 활동량 | BMR·목표 칼로리·러닝 소모 칼로리 계산 |
+| 기록 | 식단, 러닝, 컨디션 메모, 즐겨찾기 | 사용자 본인의 기록 조회 |
+
+- 이메일, 전화번호 등 연락처 정보는 수집하지 않습니다.
+- 모든 기록은 `user_id` 외래키로 계정별로 분리되며, 다른 사용자의 기록에 접근할 수
+  없습니다.
+- 수집한 정보는 앱 기능 제공 외의 목적으로 사용하거나 제3자에게 제공하지 않습니다.
+- 음식 검색 시 검색어가 식품의약품안전처 오픈API와 Anthropic Claude API로 전달되며,
+  이때 개인 식별 정보는 함께 전송되지 않습니다.
+- 계정 삭제 기능은 현재 미구현 상태이며, 앱스토어 배포 전 구현 예정입니다
+  (아래 "알려진 한계와 대응" 참고).
 
 ---
 
