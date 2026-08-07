@@ -185,15 +185,19 @@ enum RunAPIService {
         }
     }
 
-    // 시속(km/h)에 따라 MET(운동 강도) 값을 결정해 칼로리를 계산.
-    // 웹 프론트(js/app.js의 calculateRunStats)와 1:1 대응되는 계산식. 출처: https://pacompendium.com/running/
+    // 웹 프론트(js/app.js의 calculateRunStats)와 1:1 대응되는 계산식.
     // weightKg는 호출부가 실제 사용자 체중(@AppStorage("bmrWeight"))을 넘겨줌 — 예전엔 60kg 고정값을 썼음
+    // 소모 칼로리 = MET × 체중(kg) × 시간(h)
+    // MET 값 출처: 2024 Adult Compendium of Physical Activities
+    //   https://pacompendium.com/running/
+    // 각 구간의 하한 속도에 해당하는 값을 사용
+    //   예: 7.0~8.0 mph 구간 → 7 mph = 11.0
     static func calculateRunStats(distance: Double, totalMinutes: Double, weightKg: Double) -> (speedKmh: Double, caloriesBurned: Double) {
         let speedKmh = distance / (totalMinutes / 60)
 
         let met: Double
         if speedKmh < 8.05 {
-            met = 6.0
+            met = 6.5
         } else if speedKmh < 9.66 {
             met = 8.5
         } else if speedKmh < 10.78 {
@@ -201,13 +205,13 @@ enum RunAPIService {
         } else if speedKmh < 11.27 {
             met = 10.5
         } else if speedKmh < 12.87 {
-            met = 11.5
+            met = 11.0
         } else if speedKmh < 14.48 {
-            met = 12.3
+            met = 12.0
         } else if speedKmh < 16.09 {
-            met = 12.8
+            met = 13.0
         } else {
-            met = 14.5
+            met = 14.8
         }
 
         let caloriesBurned = met * weightKg * (totalMinutes / 60)
