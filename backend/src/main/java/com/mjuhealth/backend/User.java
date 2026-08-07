@@ -27,6 +27,10 @@ public class User {
     @Column(unique = true)
     private String appleId;
 
+    // Apple 계정 삭제(회원 탈퇴) 시 /auth/revoke 호출용 refresh_token. 로그인 시 authorizationCode를
+    // 교환해서 채움 — unique 아님, nullable(교환 실패/구가입자는 null로 남고, 다음 로그인 때 채워짐)
+    private String appleRefreshToken;
+
     private String nickname;
 
     // "내 정보"(BMR/목표 칼로리 계산용 입력값) — 예전엔 iOS에서 UserDefaults에만 저장해서 앱 삭제 시

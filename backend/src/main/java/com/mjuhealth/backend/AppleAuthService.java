@@ -36,14 +36,17 @@ public class AppleAuthService {
     private static final String APPLE_BUNDLE_ID = "kje.HealthProject";
 
     private final UserRepository userRepository;
+    private final AppleTokenClient appleTokenClient;
     private final JwtDecoder appleJwtDecoder =
             NimbusJwtDecoder.withJwkSetUri("https://appleid.apple.com/auth/keys").build();
 
-    public AppleAuthService(UserRepository userRepository) {
+    public AppleAuthService(UserRepository userRepository, AppleTokenClient appleTokenClient) {
         this.userRepository = userRepository;
+        this.appleTokenClient = appleTokenClient;
     }
 
-    public User login(String identityToken, String fullName, HttpServletRequest request, HttpServletResponse response) {
+    public User login(String identityToken, String fullName, String authorizationCode,
+                       HttpServletRequest request, HttpServletResponse response) {
         Jwt jwt = verify(identityToken);
 
         String appleId = jwt.getSubject();
@@ -61,7 +64,22 @@ public class AppleAuthService {
         }
         userRepository.save(user);
 
+        // 세션 수립이 먼저 끝나야 로그인이 "성공"한 것 — 아래 refresh_token 저장은 그 뒤에,
+        // 결과와 무관한 별도 try/catch로만 시도해서 실패해도 이미 끝난 로그인에 영향을 못 주게 함
         establishSession(user, request, response);
+
+        if (authorizationCode != null && !authorizationCode.isBlank()) {
+            try {
+                appleTokenClient.exchangeAuthorizationCode(authorizationCode)
+                        .ifPresent(refreshToken -> {
+                            user.setAppleRefreshToken(refreshToken);
+                            userRepository.save(user);
+                        });
+            } catch (Exception e) {
+                log.warn("Apple refresh_token 저장 실패(로그인 자체는 정상 처리됨), appleId={}", appleId, e);
+            }
+        }
+
         return user;
     }
 

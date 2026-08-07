@@ -125,11 +125,15 @@ struct LoginView: View {
             let fullName = [credential.fullName?.givenName, credential.fullName?.familyName]
                 .compactMap { $0 }
                 .joined(separator: " ")
+            // authorizationCode는 로그인마다 매번 새로 발급됨(5분 내 만료) — 백엔드가 refresh_token으로
+            // 교환해서 저장해두면 나중에 회원탈퇴 시 Apple 쪽 토큰 폐기(revoke)에 씀. 못 읽어도(거의
+            // 없는 케이스) 로그인 자체는 막지 않고 nil로 보냄
+            let authorizationCode = credential.authorizationCode.flatMap { String(data: $0, encoding: .utf8) }
             isLoggingIn = true
             errorMessage = nil
             Task {
                 do {
-                    try await RunAPIService.loginWithApple(identityToken: identityToken, fullName: fullName.isEmpty ? nil : fullName)
+                    try await RunAPIService.loginWithApple(identityToken: identityToken, fullName: fullName.isEmpty ? nil : fullName, authorizationCode: authorizationCode)
                     await UserProfileAPIService.hydrateLocalCache()
                     isLoggingIn = false
                     authManager.login()

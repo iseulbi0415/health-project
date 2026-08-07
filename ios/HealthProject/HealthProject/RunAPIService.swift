@@ -24,6 +24,7 @@ private struct NativeLoginRequest: Encodable {
 private struct AppleLoginRequest: Encodable {
     let identityToken: String
     let fullName: String?
+    let authorizationCode: String?
 }
 
 enum RunAPIService {
@@ -50,8 +51,9 @@ enum RunAPIService {
     }
 
     // Apple identity token을 백엔드로 보내 세션(JSESSIONID)을 생성 — loginWithKakao와 동일한 패턴.
-    // fullName은 Apple이 최초 로그인 시에만 내려주므로 재로그인 시엔 nil로 보내도 됨(백엔드가 기존 값 유지)
-    static func loginWithApple(identityToken: String, fullName: String?) async throws {
+    // fullName은 Apple이 최초 로그인 시에만 내려주므로 재로그인 시엔 nil로 보내도 됨(백엔드가 기존 값 유지).
+    // authorizationCode는 로그인마다 매번 보냄 — 백엔드가 refresh_token 교환에 씀(회원탈퇴 시 revoke용)
+    static func loginWithApple(identityToken: String, fullName: String?, authorizationCode: String?) async throws {
         guard let url = URL(string: "\(baseURL)/api/auth/apple/native") else {
             throw URLError(.badURL)
         }
@@ -59,7 +61,7 @@ enum RunAPIService {
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = try JSONEncoder().encode(AppleLoginRequest(identityToken: identityToken, fullName: fullName))
+        request.httpBody = try JSONEncoder().encode(AppleLoginRequest(identityToken: identityToken, fullName: fullName, authorizationCode: authorizationCode))
 
         let (_, response) = try await URLSession.shared.data(for: request)
         guard let httpResponse = response as? HTTPURLResponse,

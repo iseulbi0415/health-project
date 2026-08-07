@@ -29,7 +29,8 @@ public class AppleAuthController {
     public ResponseEntity<Map<String, Object>> login(@RequestBody AppleLoginRequest requestBody,
                                                        HttpServletRequest request, HttpServletResponse response) {
         try {
-            User user = appleAuthService.login(requestBody.identityToken(), requestBody.fullName(), request, response);
+            User user = appleAuthService.login(requestBody.identityToken(), requestBody.fullName(),
+                    requestBody.authorizationCode(), request, response);
             // Map.of는 값이 null이면 NPE를 던짐 — Apple은 이름 공유가 선택사항이라
             // user.getNickname()이 null인 경우가 실제로 있어서(실기기 테스트로 확인됨) HashMap 사용
             Map<String, Object> body = new HashMap<>();

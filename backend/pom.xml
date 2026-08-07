@@ -51,6 +51,15 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-oauth2-resource-server</artifactId>
         </dependency>
+        <!-- 원래 위 oauth2-resource-server가 전이 의존성으로만 끌어오던 라이브러리 — Apple client_secret
+             JWT 서명(AppleTokenClient)에 직접 쓰므로 명시적으로 선언. 다른 의존성과 달리 버전을 직접
+             적음 — Spring Boot BOM이 아니라 spring-security-oauth2-jose의 POM이 관리하는 버전이라
+             BOM만으로는 해석이 안 됨(로컬에 이미 받아져 있던 전이 버전 10.9를 그대로 고정) -->
+        <dependency>
+            <groupId>com.nimbusds</groupId>
+            <artifactId>nimbus-jose-jwt</artifactId>
+            <version>10.9</version>
+        </dependency>
 
         <dependency>
             <groupId>com.mysql</groupId>
