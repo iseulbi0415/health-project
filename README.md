@@ -65,8 +65,8 @@ health-project-submit/
   가벼운 음식을 나중에 먹었다고 해서 앞서 먹은 기름진 음식이 소화된 것은 아니기 때문입니다.
 
 - **사용자 개입 경로** — 공공 데이터가 부정확할 수 있으므로, 사용자가 소화 체감을 직접
-  변경하면 그 선택이 실측 지방량보다 우선합니다. 더 무거운 쪽으로 바꾼 판단을 시스템이
-  무시하는 것은 안전 측면에서 잘못된 방향이기 때문입니다.
+  변경하면 그 선택이 실측 지방량을 대체합니다. 더 무거운 쪽으로 바꾼 사용자의 판단을
+  시스템이 무시하는 것은 안전 측면에서 잘못된 방향이기 때문입니다.
 
 **"사용자는 자기가 먹은 음식의 지방량을 모른다"**
 
@@ -81,7 +81,17 @@ health-project-submit/
 | 무거움 | 30g | 4시간 |
 
 환산값은 각 구간의 **안쪽에 배치**해, 사용자의 체감이 세 단계 수준에서만 맞으면 결과가
-흔들리지 않도록 했습니다. 실측 지방량을 얻은 경우에는 항상 실측값이 우선합니다.
+흔들리지 않도록 했습니다.
+
+값의 우선순위는 다음과 같습니다.
+
+```
+1순위  AI 자동매칭으로 얻은 식약처 DB의 실측 지방량
+2순위  사용자가 고른 소화 체감 → 환산값
+```
+
+기본적으로는 실측값을 사용하고, 실측값을 얻지 못했을 때 체감 환산값으로 대체합니다.
+다만 사용자가 소화 체감을 **명시적으로 변경한 경우**에는 그 선택이 실측값을 대체합니다.
 
 ### 2. AI 음식 자동매칭
 
@@ -125,9 +135,9 @@ health-project-submit/
 | 달력 뷰 | 기록이 있는 날짜 표시, 날짜별 상세 조회 |
 | 과거 기록 관리 | 지난 날짜의 식단·러닝·메모 수정 및 삭제 |
 | 트리거 음식 | 개인별 역류 유발 음식 표시 및 경고 |
-| 러닝 기록 | 거리·시간·페이스·속도·심박수, MET 기반 소모 칼로리 |
+| 러닝 기록 | 목록에서 거리·시간·페이스 확인, 상세 화면에서 속도·심박수·소모 칼로리까지 확인 및 수정 |
 | BMR 계산 | 기초대사량, 유지 칼로리, 증량 목표 칼로리 |
-| 컨디션 메모 | 체중, 역류 증상, 운동 피드백 기록 |
+| 컨디션 메모 | 자유 텍스트, 증상 점수, 날짜별 기록 |
 | 인증 | 카카오 로그인, Sign in with Apple |
 
 ---
@@ -140,7 +150,7 @@ health-project-submit/
 | 백엔드 | Java 17, Spring Boot, Spring Data JPA, Spring Security |
 | 데이터베이스 | MySQL |
 | 인증 | Spring Security OAuth2 Client (카카오), OAuth2 Resource Server (Apple identity token 검증) |
-| 외부 API | 식품의약품안전처 식품영양성분DB, Anthropic Claude API (`claude-haiku-4-5`) |
+| 외부 API | 식품의약품안전처 식품영양성분DB, Anthropic Claude API (Claude Haiku 4.5) |
 | iOS 라이브러리 | Alamofire 5.12.0, Kakao iOS SDK 2.28.0, AuthenticationServices |
 | 배포 | Railway (백엔드 + MySQL) |
 
@@ -237,15 +247,17 @@ cp src/main/resources/application-secret.properties.example \
 소모 칼로리 = MET × 체중(kg) × 시간(h)
 ```
 
-속도 구간별 MET 값은 **Compendium of Physical Activities**
-(https://pacompendium.com/running/) 를 따릅니다.
+속도 구간별 MET 값은 **2024 Adult Compendium of Physical Activities**의 달리기
+항목을 참고했으며, 각 구간의 **하한 속도에 해당하는 값**을 사용했습니다.
+(예: 7.0~8.0 mph 구간 → 7 mph = 11.0)
+가장 느린 구간만 하한이 0이라 예외로, 원문의 최저 달리기 항목인 4 mph 값을 사용했습니다.
 
 | 속도 (km/h) | MET | | 속도 (km/h) | MET |
 |---|---|---|---|---|
-| < 8.05 | 6.0 | | < 12.87 | 11.5 |
-| < 9.66 | 8.5 | | < 14.48 | 12.3 |
-| < 10.78 | 9.3 | | < 16.09 | 12.8 |
-| < 11.27 | 10.5 | | ≥ 16.09 | 14.5 |
+| < 8.05 | 6.5 | | < 12.87 | 11.0 |
+| < 9.66 | 8.5 | | < 14.48 | 12.0 |
+| < 10.78 | 9.3 | | < 16.09 | 13.0 |
+| < 11.27 | 10.5 | | ≥ 16.09 | 14.8 |
 
 체중은 사용자가 입력한 값을 사용하며, 입력되지 않은 경우 부정확한 값이 기록에 남지
 않도록 **저장을 차단하고 입력을 안내**합니다.
@@ -293,15 +305,16 @@ cp src/main/resources/application-secret.properties.example \
    2007;5(4):439-444.
 3. Meyer JH, Lembo A, Elashoff JD, et al. Duodenal fat intensifies the perception of
    heartburn. *Gut.* 2001;49(5):624-628.
-4. Katz PO, et al. ACG Clinical Guideline for the Diagnosis and Management of
-   Gastroesophageal Reflux Disease. *Am J Gastroenterol.* 2022.
+4. Katz PO, Dunbar KB, Schnoll-Sussman FH, et al. ACG Clinical Guideline for the
+   Diagnosis and Management of Gastroesophageal Reflux Disease.
+   *Am J Gastroenterol.* 2022;117(1):27-56. doi:10.14309/ajg.0000000000001538
 5. Newberry C, Lynch K. The role of diet in the development and management of
    gastroesophageal reflux disease. *J Thorac Dis.* 2019;11(S12):S1594-S1601.
 6. 보건복지부·한국영양학회. 2025 한국인 영양소 섭취기준. 세종; 2025.
 7. 송수진, 심재은. 우리나라 성인의 총 지방 및 지방산 섭취량 평가: 2016–2017년
    국민건강영양조사. *Korean J Community Nutrition.* 2019;24(3):223-231.
-8. Ainsworth BE, et al. Compendium of Physical Activities.
-   https://pacompendium.com/running/
+8. Herrmann SD, Willis EA, Ainsworth BE, et al. 2024 Adult Compendium of Physical
+   Activities. https://pacompendium.com/running/
 
 ---
 
@@ -352,4 +365,4 @@ cp src/main/resources/application-secret.properties.example \
 ## 개발
 
 1인 개발 · 2026.06 ~ 2026.08
-개발 과정의 날짜별 기록은 [DEVLOG.md](DEVLOG.md)에서 확인할 수 있습니다.
+개발 과정의 날짜별 기록은 GitHub 저장소에서 확인할 수 있습니다.
