@@ -19,6 +19,10 @@ struct RunAddView: View {
 
     @Environment(\.dismiss) private var dismiss
 
+    // ProfileView/HomeView와 같은 키 — UserProfileAPIService.hydrateLocalCache()가 로그인 시
+    // 서버의 실제 체중으로 이미 채워둠. 칼로리 계산에 씀(RunAPIService.calculateRunStats 참고)
+    @AppStorage("bmrWeight") private var weightText = ""
+
     @State private var distanceText: String     // km
     @State private var timeText: String         // "mm:ss" 형식 (웹과 동일한 입력 관례)
     @State private var heartRateText: String    // bpm
@@ -120,13 +124,21 @@ struct RunAddView: View {
             return
         }
 
+        // 웹(app.js)과 동일한 정책 — 체중 미입력 시 60kg로 조용히 계산하는 대신 저장을 막고
+        // 내 정보 입력을 유도. 웹은 탭까지 자동으로 전환하지만, iOS는 TabView 구조를 안 건드리기
+        // 위해 알럿 안내까지만 함
+        guard let weightKg = Double(weightText) else {
+            showError("정확한 칼로리 계산을 위해 내 정보 탭에서 체중을 먼저 입력해주세요.")
+            return
+        }
+
         isSaving = true
         Task {
             do {
                 if let existingRun {
-                    _ = try await RunAPIService.updateRun(id: existingRun.id, distance: distance, totalMinutes: totalMinutes, heartRate: heartRate)
+                    _ = try await RunAPIService.updateRun(id: existingRun.id, distance: distance, totalMinutes: totalMinutes, heartRate: heartRate, weightKg: weightKg)
                 } else {
-                    _ = try await RunAPIService.createRun(distance: distance, totalMinutes: totalMinutes, heartRate: heartRate, recordedAt: recordedAt)
+                    _ = try await RunAPIService.createRun(distance: distance, totalMinutes: totalMinutes, heartRate: heartRate, weightKg: weightKg, recordedAt: recordedAt)
                 }
                 isSaving = false
                 Haptics.success()

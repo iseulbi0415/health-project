@@ -274,7 +274,10 @@ struct DietTimerView: View {
 
         let fatSum = mealFoods.reduce(0.0) { total, food in
             let category = DigestCategory(rawValue: Int(food.digestTime) ?? DigestCategory.normal.rawValue) ?? .normal
-            return total + (food.fatGrams ?? category.representativeFatGrams)
+            // fatGrams가 있으면 이미 "수량 반영된 총량"(서버 병합/FoodRecordEditView 둘 다 그렇게 유지함)이라
+            // 그대로 쓰고, 없으면(즐겨찾기 수동 등록 등) 대표값은 1개 기준이라 수량을 곱해야 함
+            let fat = food.fatGrams ?? (category.representativeFatGrams * Double(food.quantity))
+            return total + fat
         }
 
         let hours: Int

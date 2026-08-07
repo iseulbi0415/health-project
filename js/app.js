@@ -1470,10 +1470,12 @@ mealCompleteBtn.addEventListener("click", function () {
     }
 
     // 지방 실측값(검색으로 추가한 음식)이 있으면 그대로, 없으면(즐겨찾기 수동 등록 등) 근사값으로
-    // 대체하는 혼합 계산 — 정확한 데이터가 있는 만큼 합산 정확도를 끌어올림
+    // 대체하는 혼합 계산 — 정확한 데이터가 있는 만큼 합산 정확도를 끌어올림.
+    // 실측값은 이미 "수량 반영된 총량"(서버가 병합 시 누적 합산함)이라 그대로 쓰고,
+    // 대표값은 1개 기준이라 수량을 곱해야 함
     let fatSum = 0;
     mealFoods.forEach(function (food) {
-        fatSum += (food.지방 != null) ? food.지방 : digestCategoryToRepresentativeFat(food.소화시간);
+        fatSum += (food.지방 != null) ? food.지방 : digestCategoryToRepresentativeFat(food.소화시간) * (food.수량 || 1);
     });
 
     let mealHours;

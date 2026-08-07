@@ -46,31 +46,38 @@ struct ContentView: View {
     // runs의 각 요소가 Identifiable(RunRecord.id)이라 별도 id 지정 없이 바로 사용 가능
     private var runsList: some View {
             List(runs) { run in
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack {
-                        Image(systemName: "figure.run")
-                            .foregroundStyle(Color("CalorieCoral"))
-                            .font(.subheadline)
-                        // 거리 표시 (소수점 둘째 자리까지)
-                        Text("\(run.distance, specifier: "%.2f") km")
-                            .font(.headline)
-                            .monospacedDigit()
-                        Spacer()
-                        // 상대 날짜("오늘"/"어제"/"N일 전"), 일주일 이상 지나면 절대 날짜 — RunRecord.relativeDateDisplay
-                        Text(run.relativeDateDisplay)
-                            .font(.subheadline)
-                            .monospacedDigit()
-                            .foregroundStyle(.secondary)
+                // 탭하면 읽기 전용 상세 화면(RunDetailView)으로 push — 편집/삭제는 기존처럼
+                // 스와이프·컨텍스트 메뉴로, 그리고 상세 화면 안의 편집 버튼으로도 가능
+                NavigationLink {
+                    RunDetailView(run: run, onUpdated: { await loadRuns() })
+                } label: {
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack {
+                            Image(systemName: "figure.run")
+                                .foregroundStyle(Color("CalorieCoral"))
+                                .font(.subheadline)
+                            // 거리 표시 (소수점 둘째 자리까지)
+                            Text("\(run.distance, specifier: "%.2f") km")
+                                .font(.headline)
+                                .monospacedDigit()
+                            Spacer()
+                            // 상대 날짜("오늘"/"어제"/"N일 전"), 일주일 이상 지나면 절대 날짜 — RunRecord.relativeDateDisplay
+                            Text(run.relativeDateDisplay)
+                                .font(.subheadline)
+                                .monospacedDigit()
+                                .foregroundStyle(.secondary)
+                        }
+                        // 시간 / 페이스를 한 줄에 좌우로 나눠서 표시. 칼로리·시속·심박수는 목록에서 빼고
+                        // 상세 화면에 표시
+                        HStack {
+                            Text("시간 \(run.timeDisplay)")
+                            Spacer()
+                            Text("페이스 \(run.paceDisplay)")
+                        }
+                        .font(.subheadline)
+                        .monospacedDigit()
+                        .foregroundStyle(.secondary)
                     }
-                    // 시간 / 페이스를 한 줄에 좌우로 나눠서 표시
-                    HStack {
-                        Text("시간 \(run.timeDisplay)")
-                        Spacer()
-                        Text("페이스 \(run.paceDisplay)")
-                    }
-                    .font(.subheadline)
-                    .monospacedDigit()
-                    .foregroundStyle(.secondary)
                 }
                 .padding(.vertical, 4)
                 .swipeActions(edge: .trailing, allowsFullSwipe: true) {
@@ -127,6 +134,7 @@ struct ContentView: View {
                 await loadRuns()
             }
     }
+
 
     private func deleteRun(_ run: RunRecord) async {
         do {

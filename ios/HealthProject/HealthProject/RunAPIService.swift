@@ -30,9 +30,6 @@ enum RunAPIService {
 
     private static let baseURL = APIConfig.baseURL
 
-    // 체중 입력 화면이 아직 없어서(오늘 범위 아님), 웹/백엔드에 이미 있던 임시 기본값(60kg)을 그대로 씀
-    private static let defaultWeightKg = 60.0
-
     // 카카오 액세스 토큰을 백엔드로 보내 세션(JSESSIONID)을 생성. 응답의 Set-Cookie가
     // URLSession.shared의 공유 쿠키 저장소에 자동 저장되어, 이후 fetchRuns/createRun 요청에 자동으로 실림
     static func loginWithKakao(accessToken: String) async throws {
@@ -94,13 +91,14 @@ enum RunAPIService {
     }
 
     // distance(km)/totalMinutes(분)/heartRate(bpm)만 받으면 시속·칼로리는 여기서 계산해서 같이 보냄 —
-    // 웹(app.js의 calculateRunStats)과 동일한 값을 서버에 보내기 위함
-    static func createRun(distance: Double, totalMinutes: Double, heartRate: Int, recordedAt: String? = nil) async throws -> RunRecord {
+    // 웹(app.js의 calculateRunStats)과 동일한 값을 서버에 보내기 위함. weightKg는 호출부(RunAddView)가
+    // @AppStorage("bmrWeight")에서 읽어 넘김 — 이전엔 60kg 고정값을 썼음
+    static func createRun(distance: Double, totalMinutes: Double, heartRate: Int, weightKg: Double, recordedAt: String? = nil) async throws -> RunRecord {
         guard let url = URL(string: "\(baseURL)/api/runs") else {
             throw URLError(.badURL)
         }
 
-        let stats = calculateRunStats(distance: distance, totalMinutes: totalMinutes)
+        let stats = calculateRunStats(distance: distance, totalMinutes: totalMinutes, weightKg: weightKg)
         let body = NewRunRequest(
             distance: distance,
             time: totalMinutes,
@@ -133,12 +131,12 @@ enum RunAPIService {
     }
 
     // recordedAt은 항상 nil로 보냄 — RunController.updateRun이 nil이면 기존 저장 시각을 그대로 유지함
-    static func updateRun(id: Int, distance: Double, totalMinutes: Double, heartRate: Int) async throws -> RunRecord {
+    static func updateRun(id: Int, distance: Double, totalMinutes: Double, heartRate: Int, weightKg: Double) async throws -> RunRecord {
         guard let url = URL(string: "\(baseURL)/api/runs/\(id)") else {
             throw URLError(.badURL)
         }
 
-        let stats = calculateRunStats(distance: distance, totalMinutes: totalMinutes)
+        let stats = calculateRunStats(distance: distance, totalMinutes: totalMinutes, weightKg: weightKg)
         let body = NewRunRequest(
             distance: distance,
             time: totalMinutes,
@@ -189,7 +187,8 @@ enum RunAPIService {
 
     // 시속(km/h)에 따라 MET(운동 강도) 값을 결정해 칼로리를 계산.
     // 웹 프론트(js/app.js의 calculateRunStats)와 1:1 대응되는 계산식. 출처: https://pacompendium.com/running/
-    static func calculateRunStats(distance: Double, totalMinutes: Double) -> (speedKmh: Double, caloriesBurned: Double) {
+    // weightKg는 호출부가 실제 사용자 체중(@AppStorage("bmrWeight"))을 넘겨줌 — 예전엔 60kg 고정값을 썼음
+    static func calculateRunStats(distance: Double, totalMinutes: Double, weightKg: Double) -> (speedKmh: Double, caloriesBurned: Double) {
         let speedKmh = distance / (totalMinutes / 60)
 
         let met: Double
@@ -211,7 +210,7 @@ enum RunAPIService {
             met = 14.5
         }
 
-        let caloriesBurned = met * defaultWeightKg * (totalMinutes / 60)
+        let caloriesBurned = met * weightKg * (totalMinutes / 60)
         return (speedKmh, caloriesBurned)
     }
 }
