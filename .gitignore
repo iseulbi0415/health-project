@@ -6,3 +6,11 @@
 xcuserdata/
 *.xcuserstate
 DerivedData/
+
+### Secrets ###
+# Apple Sign-In 개인키 원본 — base64로 변환해 properties/환경변수로만 다루고, 원본 파일 자체는 절대 커밋 금지
+*.p8
+
+### 대회 제출 전 자료 ###
+# 발표 전 공개하고 싶지 않은 작업용 초안(SW명세서 자료 등)
+대회/작업자료/
