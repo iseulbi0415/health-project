@@ -1,5 +1,6 @@
 package com.mjuhealth.backend;
 
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
@@ -10,6 +11,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 
+@Slf4j
 @Service
 public class FoodSearchService {
 
@@ -63,15 +65,19 @@ public class FoodSearchService {
     }
 
     private List<FoodSafetyResponse.Item> fetchSortedCandidatesForLiteralKeyword(String keyword) {
+        // [PERF-TEMP] 음식 검색 20초 지연 원인 측정용 임시 로그 — 원인 파악 후 제거 예정
+        long perfStart = System.currentTimeMillis();
         String encodedKeyword = URLEncoder.encode(keyword, StandardCharsets.UTF_8);
 
         try {
             FoodSafetyResponse firstPage = fetchPage(encodedKeyword, 1);
+            log.info("[PERF-TEMP] 식약처 1페이지 조회: keyword={}, 소요={}ms", keyword, System.currentTimeMillis() - perfStart);
             // resultCode "00"이 정상. 검색결과 0건일 때도 "00"은 오지만 이땐 body.items 자체가 응답에서
             // 빠지므로(null) 어느 경우든 화면은 "검색결과 없음"으로 처리하면 충분해 예외 없이 빈 리스트로 통일
             if (firstPage == null || firstPage.header() == null
                     || !"00".equals(firstPage.header().resultCode())
                     || firstPage.body() == null || firstPage.body().items() == null) {
+                log.info("[PERF-TEMP] 식약처 조회 종료(결과없음): keyword={}, 총소요={}ms", keyword, System.currentTimeMillis() - perfStart);
                 return List.of();
             }
 
@@ -85,19 +91,25 @@ public class FoodSearchService {
             if (totalCount != null && totalCount > FETCH_ROWS) {
                 int lastPageNo = (totalCount + FETCH_ROWS - 1) / FETCH_ROWS;
                 if (lastPageNo > 1) {
+                    long secondPageStart = System.currentTimeMillis();
                     FoodSafetyResponse lastPage = fetchPage(encodedKeyword, lastPageNo);
+                    log.info("[PERF-TEMP] 식약처 마지막 페이지({}) 조회: keyword={}, totalCount={}, 소요={}ms",
+                            lastPageNo, keyword, totalCount, System.currentTimeMillis() - secondPageStart);
                     if (lastPage != null && lastPage.body() != null && lastPage.body().items() != null) {
                         items.addAll(lastPage.body().items());
                     }
                 }
             }
 
-            return sortByRelevance(items, keyword).stream()
+            List<FoodSafetyResponse.Item> result = sortByRelevance(items, keyword).stream()
                     .limit(MAX_RESULTS)
                     .toList();
+            log.info("[PERF-TEMP] 식약처 조회+정렬 종료: keyword={}, 총소요={}ms, 결과={}건", keyword, System.currentTimeMillis() - perfStart, result.size());
+            return result;
         } catch (Exception e) {
             // 식약처 API 장애(네트워크 오류, 응답 포맷 변경 등)로 우리 앱 전체가 죽으면 안 되므로
             // 실패 시에도 빈 리스트만 반환 — 사용자는 "검색결과 없음"으로 보고 즐겨찾기/직접추가로 대체 가능
+            log.warn("[PERF-TEMP] 식약처 조회 실패: keyword={}, 총소요={}ms", keyword, System.currentTimeMillis() - perfStart, e);
             return List.of();
         }
     }
@@ -105,7 +117,13 @@ public class FoodSearchService {
     private FoodSafetyResponse fetchPage(String encodedKeyword, int pageNo) {
         String url = String.format("%s?serviceKey=%s&pageNo=%d&numOfRows=%d&type=json&FOOD_NM_KR=%s",
                 ENDPOINT, serviceKey, pageNo, FETCH_ROWS, encodedKeyword);
-        return restClient.get().uri(url).retrieve().body(FoodSafetyResponse.class);
+        // [PERF-TEMP] restClient에 타임아웃이 없어서 식약처 API가 응답을 안 주면 여기서 무한정
+        // 대기할 수 있음 — 이 로그 다음에 "호출 완료" 로그가 안 찍히면 바로 여기서 멈춘 것
+        log.info("[PERF-TEMP] 식약처 API 호출 시작: pageNo={}", pageNo);
+        long callStart = System.currentTimeMillis();
+        FoodSafetyResponse response = restClient.get().uri(url).retrieve().body(FoodSafetyResponse.class);
+        log.info("[PERF-TEMP] 식약처 API 호출 완료: pageNo={}, 소요={}ms", pageNo, System.currentTimeMillis() - callStart);
+        return response;
     }
 
     // "사과" 검색 시 사과잼/사과과자 같은 가공식품이 순수 재료보다 먼저 나오는 문제 대응 —

@@ -107,8 +107,18 @@ public class AnthropicService {
     public Optional<Integer> estimateServingGrams(String foodName, boolean isStandardizedProduct) {
         long startedAt = System.currentTimeMillis();
         List<CompletableFuture<Optional<Integer>>> attempts = IntStream.range(0, ESTIMATION_ATTEMPTS)
-                .mapToObj(i -> CompletableFuture.supplyAsync(
-                        () -> estimateServingGramsOnce(foodName, isStandardizedProduct), estimationExecutor))
+                .mapToObj(i -> CompletableFuture.supplyAsync(() -> {
+                    // [PERF-TEMP] 3회 시도가 실제로 병렬로 도는지 확인용 — 시작 시각이 서로 겹치고
+                    // 스레드명이 다르면 병렬, 시작 시각이 앞 시도 종료 시각과 맞물리면 순차 실행 의심
+                    long attemptStart = System.currentTimeMillis();
+                    log.info("[PERF-TEMP] 그램수추정 시도{} 시작: food={}, thread={}, startedAt+{}ms",
+                            i, foodName, Thread.currentThread().getName(), attemptStart - startedAt);
+                    Optional<Integer> result = estimateServingGramsOnce(foodName, isStandardizedProduct);
+                    log.info("[PERF-TEMP] 그램수추정 시도{} 종료: food={}, thread={}, 소요={}ms, 성공={}, 값={}",
+                            i, foodName, Thread.currentThread().getName(),
+                            System.currentTimeMillis() - attemptStart, result.isPresent(), result.orElse(null));
+                    return result;
+                }, estimationExecutor))
                 .toList();
 
         List<Integer> successes = attempts.stream()
@@ -240,7 +250,11 @@ public class AnthropicService {
         Map<String, Object> firstUserMessage = Map.of("role", "user", "content", searchPrompt);
         firstRequestBody.put("messages", List.of(firstUserMessage));
 
+        // [PERF-TEMP] 표준화 제품 경로(웹 검색)의 두 호출 중 어디가 오래 걸리는지 분리 측정
+        long webSearchStart = System.currentTimeMillis();
         Optional<Map<String, Object>> firstResponse = postMessages(firstRequestBody);
+        log.info("[PERF-TEMP] 4.web_search 호출 소요={}ms, thread={}",
+                System.currentTimeMillis() - webSearchStart, Thread.currentThread().getName());
         if (firstResponse.isEmpty()) {
             return Optional.empty();
         }
@@ -260,11 +274,21 @@ public class AnthropicService {
                 Map.of("role", "user", "content", followUpPrompt)
         ));
 
-        return postMessages(secondRequestBody).flatMap(this::extractToolUseInput);
+        long followUpStart = System.currentTimeMillis();
+        Optional<Map<String, Object>> result = postMessages(secondRequestBody).flatMap(this::extractToolUseInput);
+        log.info("[PERF-TEMP] 4.web_search 후속(확정응답) 호출 소요={}ms, thread={}",
+                System.currentTimeMillis() - followUpStart, Thread.currentThread().getName());
+        return result;
     }
 
     private Optional<Map<String, Object>> postMessages(Map<String, Object> requestBody) {
         Map<String, Object> response;
+        // [PERF-TEMP] 401 authentication_error 원인 추적용 — 키 값 자체는 절대 안 찍고 길이/앞8자만.
+        // 공백/줄바꿈이 섞였는지 확인하려고 trim 전후 길이도 같이 남김
+        log.info("[PERF-TEMP] Claude API 키 점검: 원본길이={}, trim후길이={}, 앞8자={}",
+                apiKey == null ? -1 : apiKey.length(),
+                apiKey == null ? -1 : apiKey.trim().length(),
+                apiKey == null ? "null" : apiKey.substring(0, Math.min(8, apiKey.length())));
         try {
             response = restClient.post()
                     .uri(ENDPOINT)

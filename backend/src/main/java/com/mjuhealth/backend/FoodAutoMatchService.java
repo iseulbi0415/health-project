@@ -1,5 +1,6 @@
 package com.mjuhealth.backend;
 
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.Comparator;
@@ -9,6 +10,7 @@ import java.util.Optional;
 // /api/food-search/auto 오케스트레이션 — 기존 FoodSearchService.searchWithCategory()를 재사용하고
 // (관련도순 정렬 + 최대 15개는 이미 완전일치를 0순위로 두므로 이 기능에도 충분), 그 위에
 // "여러 후보 중 하나를 자동으로 확정"하는 로직만 얹음. FoodSearchService.search()/Controller는 무수정
+@Slf4j
 @Service
 public class FoodAutoMatchService {
 
@@ -27,7 +29,11 @@ public class FoodAutoMatchService {
     }
 
     public Optional<FoodAutoMatchResult> autoMatch(String keyword) {
+        // [PERF-TEMP] 음식 검색 20초 지연 원인 측정용 임시 로그 — 원인 파악 후 제거 예정
+        long perfStart = System.currentTimeMillis();
         List<FoodSearchService.CandidateWithCategory> candidates = foodSearchService.searchWithCategory(keyword);
+        log.info("[PERF-TEMP] 1.식약처검색(searchWithCategory) 소요={}ms, keyword={}, 후보={}건",
+                System.currentTimeMillis() - perfStart, keyword, candidates.size());
         if (candidates.isEmpty()) {
             return Optional.empty();
         }
@@ -56,7 +62,10 @@ public class FoodAutoMatchService {
             List<AnthropicService.Candidate> aiInput = aiCandidates.stream()
                     .map(c -> new AnthropicService.Candidate(c.result().name(), c.category()))
                     .toList();
+            long aiSelectStart = System.currentTimeMillis();
             Optional<Integer> aiIndex = anthropicService.selectBestMatchIndex(keyword, aiInput);
+            log.info("[PERF-TEMP] 2.Claude후보선택(selectBestMatchIndex) 소요={}ms, keyword={}, 성공={}",
+                    System.currentTimeMillis() - aiSelectStart, keyword, aiIndex.isPresent());
 
             if (aiIndex.isPresent()) {
                 chosenCandidate = aiCandidates.get(aiIndex.get());
@@ -72,7 +81,10 @@ public class FoodAutoMatchService {
         }
 
         FoodSearchResult chosen = chosenCandidate.result();
+        long gramsStart = System.currentTimeMillis();
         Optional<Integer> estimatedGrams = anthropicService.estimateServingGrams(chosen.name(), isStandardizedProduct);
+        log.info("[PERF-TEMP] 3~4.그램수추정(estimateServingGrams) 소요={}ms, food={}, 표준화제품={}, 성공={}",
+                System.currentTimeMillis() - gramsStart, chosen.name(), isStandardizedProduct, estimatedGrams.isPresent());
         int servingGrams = estimatedGrams.orElse(DEFAULT_SERVING_GRAMS);
 
         // 100g 기준값 × 추정 1인분 그램수 ÷ 100 — 소화 타이머(안전 기능)에 들어가는 계산이라 웹/iOS가
@@ -84,6 +96,8 @@ public class FoodAutoMatchService {
         // 분류하는데, 여기서 손실 반올림하면 그 경계가 밀릴 수 있어서 부동소수점 잡음만 정리하는 수준(소수 2자리)으로 둠
         Double estimatedServingFatGrams = fat == null ? null : Math.round(fat * servingGrams / 100.0 * 100) / 100.0;
 
+        log.info("[PERF-TEMP] autoMatch 전체 소요={}ms, keyword={}, matchType={}",
+                System.currentTimeMillis() - perfStart, keyword, matchType);
         return Optional.of(new FoodAutoMatchResult(
                 chosen.name(),
                 calorie,
