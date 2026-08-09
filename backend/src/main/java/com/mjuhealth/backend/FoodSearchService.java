@@ -2,11 +2,14 @@ package com.mjuhealth.backend;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 
 import java.net.URLEncoder;
+import java.net.http.HttpClient;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -31,7 +34,24 @@ public class FoodSearchService {
     @Value("${food.api.service-key}")
     private String serviceKey;
 
-    private final RestClient restClient = RestClient.create();
+    // 연결 5초/읽기 15초 — 원래 타임아웃이 아예 없어서, 식약처 API가 어쩌다 느리게 응답하거나
+    // 응답을 안 주면 그 요청이 쓰던 커넥션이 서버 재시작 전까지 영구적으로 반납이 안 됐음
+    // (2026-08-09 운영 서버 전체 장애 원인으로 추정 — 자세한 조사 경과는
+    // 음식검색_타임아웃_장애_조사_및_계획.md 참고). AnthropicService(연결 3초/읽기 15초)와
+    // 읽기 타임아웃을 통일함 — 실측상 500건×2페이지 조회가 7.6초까지 걸린 사례가 있어
+    // 연결만 여유를 더 둠(5초)
+    private final RestClient restClient = RestClient.builder()
+            .requestFactory(timeoutRequestFactory())
+            .build();
+
+    private static JdkClientHttpRequestFactory timeoutRequestFactory() {
+        HttpClient httpClient = HttpClient.newBuilder()
+                .connectTimeout(Duration.ofSeconds(5))
+                .build();
+        JdkClientHttpRequestFactory factory = new JdkClientHttpRequestFactory(httpClient);
+        factory.setReadTimeout(Duration.ofSeconds(15));
+        return factory;
+    }
 
     public List<FoodSearchResult> search(String keyword) {
         return fetchSortedCandidates(keyword).stream()
