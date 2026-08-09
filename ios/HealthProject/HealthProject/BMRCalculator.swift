@@ -20,6 +20,12 @@ enum ActivityLevel: Int, CaseIterable, Identifiable {
     case sedentary, light, moderate, active
 
     var id: Int { rawValue }
+
+    // 활동계수 — Harris-Benedict 활동계수 체계에서 통용되는 값(1.2/1.375/1.55/1.725).
+    // 단일 원 논문이 아니라 여러 임상 영양 문헌과 계산기에서 관행적으로 쓰이는
+    // 근사값이며, 개인차가 커 정밀한 추정에는 한계가 있음.
+    // (참고: 위 BMRCalculator가 쓰는 Mifflin-St Jeor 원 논문(1990)에는 활동계수가
+    // 포함되어 있지 않음 — 활동계수는 별도로 통용되는 값을 가져와 곱하는 것)
     var coefficient: Double {
         switch self {
         case .sedentary: return 1.2
