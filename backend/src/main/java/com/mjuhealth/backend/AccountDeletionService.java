@@ -9,12 +9,16 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
+
+import java.net.http.HttpClient;
+import java.time.Duration;
 
 // 회원 탈퇴(DELETE /api/auth/me) 실제 로직. Food/Run/Memo/Favorite를 먼저 지우고(FK 제약) User를
 // 지운 뒤, 외부 연동(Apple revoke/Kakao unlink)은 best-effort로만 시도한다 — 여기서 실패해도
@@ -33,7 +37,21 @@ public class AccountDeletionService {
     private final FavoriteRepository favoriteRepository;
     private final AppleTokenClient appleTokenClient;
     private final String kakaoAdminKey;
-    private final RestClient restClient = RestClient.create();
+    // 연결 3초/읽기 10초 — 카카오·애플 OAuth 단건 호출(응답이 작고 보통 1초 내 완료)이라
+    // 식약처(대량 조회)·AI(복잡한 생성)보다 짧게 잡음. 2026-08-09 식약처 타임아웃 미설정
+    // 장애(RestClient.create(), 무제한 대기)와 같은 패턴이 로그인/탈퇴 경로에도 있어 동일 조치
+    private final RestClient restClient = RestClient.builder()
+            .requestFactory(timeoutRequestFactory())
+            .build();
+
+    private static JdkClientHttpRequestFactory timeoutRequestFactory() {
+        HttpClient httpClient = HttpClient.newBuilder()
+                .connectTimeout(Duration.ofSeconds(3))
+                .build();
+        JdkClientHttpRequestFactory factory = new JdkClientHttpRequestFactory(httpClient);
+        factory.setReadTimeout(Duration.ofSeconds(10));
+        return factory;
+    }
 
     public AccountDeletionService(
             UserRepository userRepository,

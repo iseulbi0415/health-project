@@ -4,6 +4,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -18,6 +19,8 @@ import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestClientResponseException;
 
+import java.net.http.HttpClient;
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 
@@ -30,7 +33,21 @@ import java.util.Map;
 public class NativeKakaoAuthService {
 
     private final UserRepository userRepository;
-    private final RestClient restClient = RestClient.create();
+    // 연결 3초/읽기 10초 — 카카오·애플 OAuth 단건 호출(응답이 작고 보통 1초 내 완료)이라
+    // 식약처(대량 조회)·AI(복잡한 생성)보다 짧게 잡음. 2026-08-09 식약처 타임아웃 미설정
+    // 장애(RestClient.create(), 무제한 대기)와 같은 패턴이 로그인/탈퇴 경로에도 있어 동일 조치
+    private final RestClient restClient = RestClient.builder()
+            .requestFactory(timeoutRequestFactory())
+            .build();
+
+    private static JdkClientHttpRequestFactory timeoutRequestFactory() {
+        HttpClient httpClient = HttpClient.newBuilder()
+                .connectTimeout(Duration.ofSeconds(3))
+                .build();
+        JdkClientHttpRequestFactory factory = new JdkClientHttpRequestFactory(httpClient);
+        factory.setReadTimeout(Duration.ofSeconds(10));
+        return factory;
+    }
 
     public NativeKakaoAuthService(UserRepository userRepository) {
         this.userRepository = userRepository;
