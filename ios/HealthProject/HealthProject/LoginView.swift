@@ -13,17 +13,21 @@ import KakaoSDKUser
 struct LoginView: View {
     @EnvironmentObject private var authManager: AuthManager
 
-    @State private var isLoggingIn = false
+    // 어느 버튼을 눌렀는지 구분해서 그 버튼에만 로딩 UI를 표시하기 위한 상태 — 예전엔 Bool
+    // 하나(isLoggingIn)를 두 버튼이 공유해서, 애플 로그인 중에도 카카오 버튼에 스피너가 뜨는
+    // 버그가 있었음
+    private enum LoginProvider { case idle, kakao, apple }
+    @State private var loginState: LoginProvider = .idle
     @State private var errorMessage: String?
 
     var body: some View {
         VStack(spacing: 16) {
             Image(systemName: "stethoscope")
                 .font(.largeTitle)
-            Text("건강 케어 & 러닝 트래커")
+            Text("소담 - 소화 타이머")
                 .font(.title2)
                 .bold()
-            Text("로그인하고 나만의 기록을 시작하세요")
+            Text("끼니의 지방량을 기록해 소화 시간을 안내합니다")
                 .foregroundStyle(.secondary)
 
             // 카카오 공식 로그인 버튼 가이드라인(옐로우 #FEE500 배경 + 검정 텍스트) 적용.
@@ -31,7 +35,7 @@ struct LoginView: View {
             // 아이콘 없이 텍스트만 — 애플 버튼과 높이/폭을 맞춰 두 버튼이 나란히 통일감 있게 보이게 함
             Button(action: login) {
                 Group {
-                    if isLoggingIn {
+                    if loginState == .kakao {
                         ProgressView()
                     } else {
                         Text("카카오 로그인")
@@ -44,7 +48,8 @@ struct LoginView: View {
             .foregroundStyle(.black)
             .background(Color(red: 254 / 255, green: 229 / 255, blue: 0 / 255))
             .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-            .disabled(isLoggingIn)
+            .disabled(loginState != .idle)
+            .opacity(loginState == .idle || loginState == .kakao ? 1 : 0.4)
 
             // SignInWithAppleButton의 문구는 기기 시스템 언어를 따라가는데, 이 앱은 로컬라이징이
             // 안 되어 있어(developmentRegion=en, 지원 언어 선언 없음) 기기가 한국어여도 시스템이
@@ -58,7 +63,17 @@ struct LoginView: View {
             .frame(maxWidth: .infinity)
             .frame(height: 44)
             .environment(\.locale, Locale(identifier: "ko_KR"))
-            .disabled(isLoggingIn)
+            .disabled(loginState != .idle)
+            .opacity(loginState == .idle || loginState == .apple ? 1 : 0.4)
+            .overlay {
+                // SignInWithAppleButton은 시스템 컴포넌트라 내부 콘텐츠(텍스트)를 직접 못
+                // 바꾸므로(가이드라인상으로도 권장 안 됨), 카카오 버튼처럼 텍스트를 스왑하는
+                // 대신 위에 스피너를 얹는 방식으로 로딩 상태를 표시함
+                if loginState == .apple {
+                    ProgressView()
+                        .tint(.white)
+                }
+            }
 
             if let errorMessage {
                 Text(errorMessage)
@@ -70,7 +85,7 @@ struct LoginView: View {
     }
 
     private func login() {
-        isLoggingIn = true
+        loginState = .kakao
         errorMessage = nil
         Task {
             do {
@@ -79,10 +94,10 @@ struct LoginView: View {
                 // 앱을 삭제했다 재설치한 경우 로컬 캐시(@AppStorage)가 비어있으므로, 로그인 성공
                 // 직후 서버에 저장된 "내 정보"로 복원함 — 실패해도 로그인 자체는 막지 않음
                 await UserProfileAPIService.hydrateLocalCache()
-                isLoggingIn = false
+                loginState = .idle
                 authManager.login()
             } catch {
-                isLoggingIn = false
+                loginState = .idle
                 errorMessage = "로그인 실패: \(error.localizedDescription)"
             }
         }
@@ -129,16 +144,16 @@ struct LoginView: View {
             // 교환해서 저장해두면 나중에 회원탈퇴 시 Apple 쪽 토큰 폐기(revoke)에 씀. 못 읽어도(거의
             // 없는 케이스) 로그인 자체는 막지 않고 nil로 보냄
             let authorizationCode = credential.authorizationCode.flatMap { String(data: $0, encoding: .utf8) }
-            isLoggingIn = true
+            loginState = .apple
             errorMessage = nil
             Task {
                 do {
                     try await RunAPIService.loginWithApple(identityToken: identityToken, fullName: fullName.isEmpty ? nil : fullName, authorizationCode: authorizationCode)
                     await UserProfileAPIService.hydrateLocalCache()
-                    isLoggingIn = false
+                    loginState = .idle
                     authManager.login()
                 } catch {
-                    isLoggingIn = false
+                    loginState = .idle
                     errorMessage = "로그인 실패: \(error.localizedDescription)"
                 }
             }
