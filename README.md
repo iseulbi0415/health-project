@@ -309,33 +309,43 @@ cp src/main/resources/application-secret.properties.example \
 | 국민건강영양조사 실제 섭취 (1일 46g ÷ 3끼) | 약 15g |
 | 위 배출 연구가 "저지방식"으로 정의한 값 | 9.2g |
 
+- **한국인 영양소 섭취기준**: 2,000kcal 기준 → 지방 300~600kcal(에너지적정비율 15~30%)
+  → 하루 33~67g → 한 끼 11~22g으로 환산.
+- **국민건강영양조사**: 2016~2017년 조사를 분석한 송수진·심재은(2019)에 따르면 한국
+  성인 1일 총 지방 섭취량은 약 46g(지방 에너지 비율 21%) → 한 끼 약 15g.
+- **위 배출 연구**: Stacher 등(1991)이 건강한 남성 12명을 대상으로 저지방식(9.2g)과
+  고지방식(37.9g)의 위 배출 속도를 신티그래피로 비교한 실험에서 정의한 "저지방식" 값.
+
 **10g**은 세 기준 모두에서 보통보다 가벼운 쪽, **25g**은 모두에서 보통을 넘어선 쪽입니다.
 
 ### 참고문헌
 
 1. Hunt JN, Smith JL, Jiang CL. Effect of meal volume and energy density on the
    gastric emptying of carbohydrates. *Gastroenterology.* 1985;89:1326-1330.
-2. Fox M, Barr C, Nolan S, et al. The effects of dietary fat and calorie density on
+2. Stacher G, Granser GV, Bergmann H, et al. Slow gastric emptying induced by high
+   fat content of meal accelerated by cisapride administered rectally.
+   *Dig Dis Sci.* 1991;36(9):1259-1265.
+3. Fox M, Barr C, Nolan S, et al. The effects of dietary fat and calorie density on
    esophageal acid exposure and reflux symptoms. *Clin Gastroenterol Hepatol.*
    2007;5(4):439-444.
-3. Meyer JH, Lembo A, Elashoff JD, et al. Duodenal fat intensifies the perception of
+4. Meyer JH, Lembo A, Elashoff JD, et al. Duodenal fat intensifies the perception of
    heartburn. *Gut.* 2001;49(5):624-628.
-4. Katz PO, Dunbar KB, Schnoll-Sussman FH, et al. ACG Clinical Guideline for the
+5. Katz PO, Dunbar KB, Schnoll-Sussman FH, et al. ACG Clinical Guideline for the
    Diagnosis and Management of Gastroesophageal Reflux Disease.
    *Am J Gastroenterol.* 2022;117(1):27-56. doi:10.14309/ajg.0000000000001538
-5. Newberry C, Lynch K. The role of diet in the development and management of
+6. Newberry C, Lynch K. The role of diet in the development and management of
    gastroesophageal reflux disease: why we feel the burn. *J Thorac Dis.*
    2019;11(Suppl 12):S1594-S1601. doi:10.21037/jtd.2019.06.42
-6. 보건복지부·한국영양학회. 2025 한국인 영양소 섭취기준. 세종; 2025.
-7. 송수진, 심재은. 우리나라 성인의 총 지방 및 지방산 섭취량 평가: 2016–2017년
+7. 보건복지부·한국영양학회. 2025 한국인 영양소 섭취기준. 세종; 2025.
+8. 송수진, 심재은. 우리나라 성인의 총 지방 및 지방산 섭취량 평가: 2016–2017년
    국민건강영양조사 자료를 활용하여. *Korean J Community Nutrition.*
    2019;24(3):223-231. doi:10.5720/kjcn.2019.24.3.223
-8. Mifflin MD, St Jeor ST, Hill LA, Scott BJ, Daugherty SA, Koh YO. A new predictive
+9. Mifflin MD, St Jeor ST, Hill LA, Scott BJ, Daugherty SA, Koh YO. A new predictive
    equation for resting energy expenditure in healthy individuals.
    *Am J Clin Nutr.* 1990;51(2):241-247.
-9. Herrmann SD, Willis EA, Ainsworth BE, et al. 2024 Adult Compendium of Physical
-   Activities. https://pacompendium.com/running/
-10. 삼성서울병원 건강정보. 체중을 늘리고 싶은데, 얼마만큼 먹어야 할까요?
+10. Herrmann SD, Willis EA, Ainsworth BE, et al. 2024 Adult Compendium of Physical
+    Activities. https://pacompendium.com/running/
+11. 삼성서울병원 건강정보. 체중을 늘리고 싶은데, 얼마만큼 먹어야 할까요?
 
 ---
 
