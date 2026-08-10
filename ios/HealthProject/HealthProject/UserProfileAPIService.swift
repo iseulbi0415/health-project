@@ -68,21 +68,34 @@ enum UserProfileAPIService {
     static func hydrateLocalCache() async {
         guard let profile = try? await fetchProfile() else { return }
 
+        // 계정마다 서버 값이 다르므로, 값이 없으면(nil) 이전 계정이 남긴 로컬 캐시가 그대로
+        // 남지 않도록 명시적으로 지움 — 이전엔 nil일 때 아무것도 안 해서, 계정을 전환하면
+        // 직전 계정의 키/몸무게가 새 계정 화면에 그대로 남아있는 버그가 있었음
         let defaults = UserDefaults.standard
         if let heightCm = profile.heightCm {
             defaults.set(Self.trimmedNumberString(heightCm), forKey: "bmrHeight")
+        } else {
+            defaults.removeObject(forKey: "bmrHeight")
         }
         if let weightKg = profile.weightKg {
             defaults.set(Self.trimmedNumberString(weightKg), forKey: "bmrWeight")
+        } else {
+            defaults.removeObject(forKey: "bmrWeight")
         }
         if let age = profile.age {
             defaults.set(String(age), forKey: "bmrAge")
+        } else {
+            defaults.removeObject(forKey: "bmrAge")
         }
         if let gender = profile.gender {
             defaults.set(gender, forKey: "bmrGender")
+        } else {
+            defaults.removeObject(forKey: "bmrGender")
         }
         if let activityLevel = profile.activityLevel {
             defaults.set(activityLevel, forKey: "bmrActivityLevel")
+        } else {
+            defaults.removeObject(forKey: "bmrActivityLevel")
         }
         defaults.set(profile.hasCalculatedGoal, forKey: "goalCalculated")
     }

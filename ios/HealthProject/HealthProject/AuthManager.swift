@@ -35,6 +35,13 @@ final class AuthManager: ObservableObject {
         // (즐겨찾기는 서버 DB 저장으로 전환되어 더 이상 여기서 지울 필요 없음 — 계정마다
         // 로그인 시 서버에서 새로 불러오므로 자동으로 분리됨)
         DigestionTimerManager.shared.cancel()
+        // 내 정보(BMR 입력값)도 같은 이유로 로그아웃 시점에 정리 — hydrateLocalCache()가 서버
+        // 값이 없을 때(nil) 로컬을 지우도록 고쳤지만(UserProfileAPIService 참고), 그 호출이
+        // 네트워크 오류 등으로 실패하는 경우까지 대비한 안전망. 다음 로그인 시
+        // hydrateLocalCache()가 그 계정의 서버 값으로 다시 채움
+        for key in ["bmrHeight", "bmrWeight", "bmrAge", "bmrGender", "bmrActivityLevel", "goalCalculated"] {
+            UserDefaults.standard.removeObject(forKey: key)
+        }
     }
 
     // 앱 시작 시 UserDefaults 값만 믿지 않고 서버에 세션이 진짜 살아있는지 확인.
