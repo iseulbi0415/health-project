@@ -31,7 +31,7 @@ public class RunController {
         if (run.getTime() <= 0) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "시간은 0보다 커야 합니다.");
         }
-        if (run.getHeartRate() < MIN_HEART_RATE || run.getHeartRate() > MAX_HEART_RATE) {
+        if (run.getHeartRate() != null && (run.getHeartRate() < MIN_HEART_RATE || run.getHeartRate() > MAX_HEART_RATE)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "심박수가 올바르지 않습니다.");
         }
     }

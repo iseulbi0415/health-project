@@ -968,7 +968,7 @@ function renderRunList() {
             card.innerHTML = `
                 <input type="number" class="inp edit-distance-input" value="${record.거리}" step="0.01">
                 <input type="text" class="inp edit-time-input" value="${totalMin}:${String(totalSec).padStart(2, '0')}">
-                <input type="number" class="inp edit-heartrate-input" value="${record.심박수}">
+                <input type="number" class="inp edit-heartrate-input" value="${record.심박수 ?? ''}" placeholder="심박수(선택)">
                 <input type="date" class="inp edit-run-date-input" value="${toDateInputValue(record.기록시각)}">
                 <button type="button" class="btn-save-small">저장</button>
                 <button type="button" class="btn-cancel-small">취소</button>
@@ -984,10 +984,6 @@ function renderRunList() {
                     alert("시간을 입력해주세요!");
                     return;
                 }
-                if (!card.querySelector(".edit-heartrate-input").value) {
-                    alert("심박수를 입력해주세요!");
-                    return;
-                }
                 if (!card.querySelector(".edit-run-date-input").value) {
                     alert("날짜를 선택해주세요!");
                     return;
@@ -1001,7 +997,8 @@ function renderRunList() {
                 const newSeconds = Number(newTimeParts[1]) || 0;
                 const newTotalMinutes = newMinutes + (newSeconds / 60);
 
-                const newHeartrate = Number(card.querySelector(".edit-heartrate-input").value);
+                const editHeartRateInputValue = card.querySelector(".edit-heartrate-input").value;
+                const newHeartrate = editHeartRateInputValue ? Number(editHeartRateInputValue) : null;
                 const newDate = card.querySelector(".edit-run-date-input").value;
 
                 const editError = validateRunInput(newDistance, newTotalMinutes, newHeartrate);
@@ -1042,6 +1039,10 @@ function renderRunList() {
 
         } else {
             // 평소/편집모드 공통: 정보 그리드는 항상 보여줌
+            // 심박수는 선택 입력이라 값이 없으면(null) 이 칸 자체를 생략함 — iOS RunDetailView와 동일한 규칙
+            const heartRateStatHtml = record.심박수 != null
+                ? `<div class="rc-stat"><div class="rc-val">${record.심박수}bpm</div><div class="rc-lbl">심박수</div></div>`
+                : "";
             card.innerHTML = `
             <div class="rc-date">${toDateInputValue(record.기록시각) || "날짜 없음"}</div>
             <div class="rc-grid">
@@ -1049,7 +1050,7 @@ function renderRunList() {
                 <div class="rc-stat"><div class="rc-val">${timeDisplay}</div><div class="rc-lbl">시간</div></div>
                 <div class="rc-stat"><div class="rc-val">${paceDisplay}</div><div class="rc-lbl">페이스</div></div>
                 <div class="rc-stat"><div class="rc-val">${record.시속.toFixed(1)}km/h</div><div class="rc-lbl">시속</div></div>
-                <div class="rc-stat"><div class="rc-val">${record.심박수}bpm</div><div class="rc-lbl">심박수</div></div>
+                ${heartRateStatHtml}
                 <div class="rc-stat"><div class="rc-val">${record.칼로리.toFixed(0)}kcal</div><div class="rc-lbl">칼로리</div></div>
             </div>
             `;
@@ -1118,7 +1119,7 @@ function renderRunList() {
 function validateRunInput(distance, totalMinutes, heartRate) {
     if (distance <= 0) return "거리는 0보다 커야 합니다.";
     if (totalMinutes <= 0) return "시간은 0보다 커야 합니다.";
-    if (heartRate < 30 || heartRate > 250) return "심박수가 올바르지 않습니다 (30~250 사이로 입력해주세요).";
+    if (heartRate !== null && (heartRate < 30 || heartRate > 250)) return "심박수가 올바르지 않습니다 (30~250 사이로 입력해주세요).";
     return null;
 }
 
@@ -1599,10 +1600,6 @@ runSaveBtn.addEventListener("click", async function () {
         alert("시간을 입력해주세요!");
         return;
     }
-    if (!document.getElementById("run-heartrate-input").value) {
-        alert("심박수를 입력해주세요!");
-        return;
-    }
     // 체중을 한 번도 입력한 적 없으면(내 정보 미작성) 기본값(60kg)으로 조용히 계산하는 대신
     // 저장을 막고 내 정보 입력을 유도 — 잘못된 칼로리 값이 기록에 남는 것을 방지
     if (!localStorage.getItem("userWeight")) {
@@ -1619,7 +1616,9 @@ runSaveBtn.addEventListener("click", async function () {
     const seconds = Number(timeParts[1]) || 0;
     const totalMinutes = minutes + (seconds / 60);
 
-    const heartrate = Number(document.getElementById("run-heartrate-input").value);
+    // 심박수는 선택 입력 — 비워두면 null로 저장(iOS/서버와 동일한 규칙)
+    const heartrateInputValue = document.getElementById("run-heartrate-input").value;
+    const heartrate = heartrateInputValue ? Number(heartrateInputValue) : null;
 
     const runError = validateRunInput(distance, totalMinutes, heartrate);
     if (runError) {

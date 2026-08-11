@@ -22,7 +22,7 @@ public class Run {
 
     private double distance;
     private double time;
-    private int heartRate;
+    private Integer heartRate;
     private double speedKmh;
     private double calorieBurned;
     // 저장 시각: POST 때는 서버가 항상 자동으로 채우고, PUT 때만 값이 오면 갱신 (RunController 참고)

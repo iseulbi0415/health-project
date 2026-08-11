@@ -16,7 +16,7 @@ struct RunRecord: Codable, Identifiable {
     let id: Int
     let distance: Double        // km 단위 (백엔드 Run.java의 distance 필드)
     let time: Double            // 분(minute) 단위, 소수 가능 (예: 30.5분 = 30분 30초)
-    let heartRate: Int
+    let heartRate: Int?
     let speedKmh: Double
     let calorieBurned: Double
     // ISO datetime 문자열(예: "2026-07-31T14:30:00") — 앞 10자리(yyyy-MM-dd)만 relativeDateDisplay에서 씀

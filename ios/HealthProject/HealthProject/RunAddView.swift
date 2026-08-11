@@ -36,7 +36,7 @@ struct RunAddView: View {
         self.existingRun = existingRun
         self._distanceText = State(initialValue: existingRun.map { String($0.distance) } ?? "")
         self._timeText = State(initialValue: existingRun.map { RunAddView.mmss(from: $0.time) } ?? "")
-        self._heartRateText = State(initialValue: existingRun.map { String($0.heartRate) } ?? "")
+        self._heartRateText = State(initialValue: existingRun.flatMap { $0.heartRate.map(String.init) } ?? "")
     }
 
     // RunRecord.time(분, 소수)을 입력창의 "mm:ss" 표기로 되돌리는 역변환 — parseTotalMinutes()의 반대
@@ -53,7 +53,7 @@ struct RunAddView: View {
                         .keyboardType(.decimalPad)
                     TextField("시간 (예: 30:15)", text: $timeText)
                         .keyboardType(.numbersAndPunctuation)
-                    TextField("심박수 (bpm)", text: $heartRateText)
+                    TextField("심박수 (bpm, 선택)", text: $heartRateText)
                         .keyboardType(.numberPad)
                 }
             }
@@ -103,12 +103,19 @@ struct RunAddView: View {
             showError("시간을 올바르게 입력해주세요 (예: 30:15).")
             return
         }
-        guard let heartRate = Int(heartRateText) else {
+        let trimmedHeartRateText = heartRateText.trimmingCharacters(in: .whitespaces)
+        let heartRate: Int?
+        if trimmedHeartRateText.isEmpty {
+            heartRate = nil
+        } else if let parsed = Int(trimmedHeartRateText) {
+            heartRate = parsed
+        } else {
             showError("심박수를 올바른 숫자로 입력해주세요.")
             return
         }
 
-        // 웹의 validateRunInput()과 동일한 기준: 거리/시간은 0 초과, 심박수는 30~250만 허용
+        // 웹의 validateRunInput()과 동일한 기준: 거리/시간은 0 초과, 심박수는 선택 입력이라
+        // 입력했을 때만 30~250 범위를 검사함
         // (백엔드 RunController.validateRun()에도 같은 기준으로 2차 검증이 있어서, 여길 통과해도
         // 서버가 한 번 더 확인함)
         if distance <= 0 {
@@ -119,7 +126,7 @@ struct RunAddView: View {
             showError("시간은 0보다 커야 합니다.")
             return
         }
-        if heartRate < 30 || heartRate > 250 {
+        if let heartRate, heartRate < 30 || heartRate > 250 {
             showError("심박수가 올바르지 않습니다 (30~250 사이로 입력해주세요).")
             return
         }

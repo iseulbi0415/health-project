@@ -11,7 +11,7 @@ import Foundation
 private struct NewRunRequest: Encodable {
     let distance: Double
     let time: Double
-    let heartRate: Int
+    let heartRate: Int?
     let speedKmh: Double
     let calorieBurned: Double
     let recordedAt: String?
@@ -95,7 +95,7 @@ enum RunAPIService {
     // distance(km)/totalMinutes(분)/heartRate(bpm)만 받으면 시속·칼로리는 여기서 계산해서 같이 보냄 —
     // 웹(app.js의 calculateRunStats)과 동일한 값을 서버에 보내기 위함. weightKg는 호출부(RunAddView)가
     // @AppStorage("bmrWeight")에서 읽어 넘김 — 이전엔 60kg 고정값을 썼음
-    static func createRun(distance: Double, totalMinutes: Double, heartRate: Int, weightKg: Double, recordedAt: String? = nil) async throws -> RunRecord {
+    static func createRun(distance: Double, totalMinutes: Double, heartRate: Int?, weightKg: Double, recordedAt: String? = nil) async throws -> RunRecord {
         guard let url = URL(string: "\(baseURL)/api/runs") else {
             throw URLError(.badURL)
         }
@@ -133,7 +133,7 @@ enum RunAPIService {
     }
 
     // recordedAt은 항상 nil로 보냄 — RunController.updateRun이 nil이면 기존 저장 시각을 그대로 유지함
-    static func updateRun(id: Int, distance: Double, totalMinutes: Double, heartRate: Int, weightKg: Double) async throws -> RunRecord {
+    static func updateRun(id: Int, distance: Double, totalMinutes: Double, heartRate: Int?, weightKg: Double) async throws -> RunRecord {
         guard let url = URL(string: "\(baseURL)/api/runs/\(id)") else {
             throw URLError(.badURL)
         }

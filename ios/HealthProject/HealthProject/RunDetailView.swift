@@ -49,7 +49,7 @@ struct RunDetailView: View {
                 }
 
                 // 나머지 값들 — 목록에서 폐기했던 그리드 셀 레이아웃을 여기서 재사용(전체 화면이라 잘 맞음).
-                // 심박수가 0이면(구 기록 등 데이터 없음) statCells에서 아예 빠져서 자연스럽게 생략됨
+                // 심박수가 nil이면(선택 입력이라 미입력) statCells에서 아예 빠져서 자연스럽게 생략됨
                 Section {
                     LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 3), spacing: 8) {
                         ForEach(statCells, id: \.label) { cell in
@@ -86,8 +86,8 @@ struct RunDetailView: View {
             ("\(Int(run.calorieBurned.rounded()))kcal", "칼로리"),
             (String(format: "%.1fkm/h", run.speedKmh), "시속")
         ]
-        if run.heartRate > 0 {
-            cells.append(("\(run.heartRate)bpm", "심박수"))
+        if let heartRate = run.heartRate {
+            cells.append(("\(heartRate)bpm", "심박수"))
         }
         return cells
     }
