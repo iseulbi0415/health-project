@@ -58,10 +58,10 @@ public class FoodController {
     public List<Food> getAllFoods(@RequestParam(required = false) String date, @AuthenticationPrincipal KakaoOAuth2User principal) {
         if (date != null) {
             LocalDate day = LocalDate.parse(date);
-            return foodRepository.findByUserIdAndRecordedAtGreaterThanEqualAndRecordedAtLessThanOrderByRecordedAtDesc(
+            return foodRepository.findByUserIdAndRecordedAtGreaterThanEqualAndRecordedAtLessThanOrderByRecordedAtDescIdDesc(
                     principal.getInternalUserId(), day.atStartOfDay(), day.plusDays(1).atStartOfDay());
         }
-        return foodRepository.findByUserIdOrderByRecordedAtDesc(principal.getInternalUserId());
+        return foodRepository.findByUserIdOrderByRecordedAtDescIdDesc(principal.getInternalUserId());
     }
 
     @PutMapping(value = "/{id}", produces = "application/json;charset=UTF-8")

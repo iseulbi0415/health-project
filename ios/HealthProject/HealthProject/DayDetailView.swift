@@ -42,6 +42,15 @@ struct DayDetailView: View {
         }
         return index
     }
+
+    // DietTimerView.groupedTodayFoods와 동일한 방식 — 끼니 헤더를 붙여서 이 화면도 식단·타이머
+    // 탭과 같은 방식으로 읽히게 함
+    private var groupedFoods: [(meal: Meal, foods: [FoodRecord])] {
+        Meal.allCases.compactMap { meal in
+            let mealFoods = sortedFoods.filter { $0.meal == meal.rawValue }
+            return mealFoods.isEmpty ? nil : (meal, mealFoods)
+        }
+    }
     @State private var isLoading = false
     @State private var errorMessage: String?
 
@@ -71,25 +80,31 @@ struct DayDetailView: View {
                     if foods.isEmpty {
                         Text("기록 없음").foregroundStyle(.secondary)
                     } else {
-                        ForEach(sortedFoods) { food in
-                            HStack {
-                                Text(food.quantity > 1 ? "\(food.name) ×\(food.quantity)" : food.name)
-                                Spacer()
-                                Text("\(food.calorie) kcal")
-                            }
-                            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                                Button("삭제", role: .destructive) {
-                                    Task { await deleteFood(food) }
+                        ForEach(groupedFoods, id: \.meal) { group in
+                            Text(group.meal.label)
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+
+                            ForEach(group.foods) { food in
+                                HStack {
+                                    Text(food.quantity > 1 ? "\(food.name) ×\(food.quantity)" : food.name)
+                                    Spacer()
+                                    Text("\(food.calorie) kcal")
                                 }
-                            }
-                            .swipeActions(edge: .leading) {
-                                Button("수정") { editingFood = food }
-                                    .tint(.blue)
-                            }
-                            .contextMenu {
-                                Button("수정") { editingFood = food }
-                                Button("삭제", role: .destructive) {
-                                    Task { await deleteFood(food) }
+                                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                    Button("삭제", role: .destructive) {
+                                        Task { await deleteFood(food) }
+                                    }
+                                }
+                                .swipeActions(edge: .leading) {
+                                    Button("수정") { editingFood = food }
+                                        .tint(.blue)
+                                }
+                                .contextMenu {
+                                    Button("수정") { editingFood = food }
+                                    Button("삭제", role: .destructive) {
+                                        Task { await deleteFood(food) }
+                                    }
                                 }
                             }
                         }
@@ -160,7 +175,7 @@ struct DayDetailView: View {
                     // 안내 문구를 겹쳐 보여줌(MemoEditView와 동일한 패턴)
                     ZStack(alignment: .topLeading) {
                         if memoText.isEmpty {
-                            Text("오늘 컨디션이나 증상을 자유롭게 적어보세요")
+                            Text("이 날의 컨디션이나 증상을 자유롭게 적어보세요")
                                 .foregroundStyle(.secondary)
                                 .padding(.top, 8)
                                 .padding(.leading, 5)

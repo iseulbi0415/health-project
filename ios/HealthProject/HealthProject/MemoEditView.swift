@@ -48,7 +48,7 @@ struct MemoEditView: View {
                     // 안내 문구를 겹쳐 보여주고 타이핑을 시작하면 사라지게 함(ZStack 트릭)
                     ZStack(alignment: .topLeading) {
                         if content.isEmpty {
-                            Text("오늘 컨디션이나 증상을 자유롭게 적어보세요")
+                            Text("이 날의 컨디션이나 증상을 자유롭게 적어보세요")
                                 .foregroundStyle(.secondary)
                                 .padding(.top, 8)
                                 .padding(.leading, 5)

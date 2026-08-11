@@ -35,8 +35,8 @@ public class RecordSummaryController {
         String monthStartStr = ym.atDay(1).toString();
         String monthEndStr = ym.atEndOfMonth().toString();
 
-        List<Food> foods = foodRepository.findByUserIdAndRecordedAtGreaterThanEqualAndRecordedAtLessThanOrderByRecordedAtDesc(userId, monthStart, monthEnd);
-        List<Run> runs = runRepository.findByUserIdAndRecordedAtGreaterThanEqualAndRecordedAtLessThanOrderByRecordedAtDesc(userId, monthStart, monthEnd);
+        List<Food> foods = foodRepository.findByUserIdAndRecordedAtGreaterThanEqualAndRecordedAtLessThanOrderByRecordedAtDescIdDesc(userId, monthStart, monthEnd);
+        List<Run> runs = runRepository.findByUserIdAndRecordedAtGreaterThanEqualAndRecordedAtLessThanOrderByRecordedAtDescIdDesc(userId, monthStart, monthEnd);
         List<Memo> memos = memoRepository.findByUserIdAndDateBetween(userId, monthStartStr, monthEndStr);
 
         Set<String> markedDates = new TreeSet<>();
