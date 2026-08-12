@@ -23,6 +23,10 @@ struct DietTimerView: View {
     @State private var showActionAlert = false
     @State private var editingFood: FoodRecord?
     @State private var isShowingSearchSheet = false
+    // App Store Review Guidelines 1.4.1 대응 — 소화 대기 시간 판정 근거(ACG 가이드라인·위 배출
+    // 연구)를 보여주는 공용 시트(CalculationSourcesView, ProfileView·RunDetailView와 동일 화면 재사용).
+    // 음식 기록/타이머 동작 여부와 무관하게 상시 노출되어야 해서 "소화 타이머" Section 안에 둠
+    @State private var isShowingCalculationSources = false
     // FoodPickerSections에 Binding으로 넘김 — List 안에 끼워지는 자식 뷰가 아니라 List를 직접
     // 소유한 이 뷰가 상태와 .sheet를 들고 있어야 하는 이유는 FoodPickerSections.swift 주석 참고
     @State private var editingFavorite: FavoriteFood?
@@ -192,6 +196,12 @@ struct DietTimerView: View {
                             digestionTimerManager.cancel()
                         }
                     }
+
+                    Button("계산 근거 보기") {
+                        isShowingCalculationSources = true
+                    }
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
                 }
             }
             .listStyle(.insetGrouped)
@@ -221,6 +231,9 @@ struct DietTimerView: View {
                 FavoriteAddView(existingFavorite: favorite, onSave: { updated in
                     Task { await foodPicker.updateFavorite(updated) }
                 })
+            }
+            .sheet(isPresented: $isShowingCalculationSources) {
+                CalculationSourcesView()
             }
             .alert("확인해주세요", isPresented: $showActionAlert) {
                 Button("확인", role: .cancel) {}

@@ -21,6 +21,10 @@ struct ProfileView: View {
     // localStorage "tdee" 존재 여부와 동등: 입력값만 채워져 있고 계산을 안 눌렀으면 목표 없음 상태 유지)
     @AppStorage("goalCalculated") private var hasCalculatedGoal = false
     @State private var isShowingBMRSheet = false
+    // App Store Review Guidelines 1.4.1 대응 — BMR/소모 칼로리/소화 대기 시간 계산 근거를
+    // 모아 보여주는 공용 시트(CalculationSourcesView). 계산 전/후 상관없이 항상 진입 가능해야
+    // 해서(재거절 당시 값 미입력 상태에서도 출처를 못 찾은 것으로 추정) if/else 밖에 둠
+    @State private var isShowingCalculationSources = false
 
     @State private var recentMemos: [MemoRecord] = []
     @State private var isLoadingMemos = false
@@ -134,6 +138,13 @@ struct ProfileView: View {
                         .buttonStyle(.glassProminent)
                         .tint(.accentColor)
                     }
+
+                    // if/else 밖 — 계산 전(BMR 계산하기 버튼만 있는 상태)에도 항상 보이게 함
+                    Button("계산 근거 보기") {
+                        isShowingCalculationSources = true
+                    }
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
                 } header: {
                     Label("BMR / 목표 칼로리", systemImage: "flame.fill")
                 }
@@ -182,10 +193,23 @@ struct ProfileView: View {
                 // 링크도 기본 파란색 대신 회색 계열로 눌러서 화면에서 튀지 않게 함
                 Section {
                     VStack(alignment: .leading, spacing: 6) {
-                        Link("개인정보 처리방침",
-                             destination: URL(string: "https://iseulbi0415.github.io/health-project/privacy.html")!)
+                        // List/Form 행 안에 탭 가능한 요소(Link, Button)를 여러 개 두면 SwiftUI가
+                        // 행 전체를 하나의 탭 영역으로 묶어서 아무 데나 눌러도 둘 다 반응하는 문제가
+                        // 있음 — .buttonStyle(.borderless)로 각자 자기 영역만 반응하도록 분리
+                        HStack(spacing: 16) {
+                            Link("개인정보 처리방침",
+                                 destination: URL(string: "https://iseulbi0415.github.io/health-project/privacy.html")!)
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                                .buttonStyle(.borderless)
+
+                            Button("계산 근거 및 출처") {
+                                isShowingCalculationSources = true
+                            }
                             .font(.footnote)
                             .foregroundStyle(.secondary)
+                            .buttonStyle(.borderless)
+                        }
 
                         Text("소담은 의료기기가 아니며 질병의 진단·치료·예방을 목적으로 하지 않습니다. 제공되는 대기 시간은 참고값이며, 증상이 지속되면 의료 전문가와 상담하세요.")
                             .font(.caption2)
@@ -242,6 +266,9 @@ struct ProfileView: View {
                 MemoEditView(onSaved: {
                     Task { await loadRecentMemos() }
                 })
+            }
+            .sheet(isPresented: $isShowingCalculationSources) {
+                CalculationSourcesView()
             }
             .task {
                 await loadRecentMemos()

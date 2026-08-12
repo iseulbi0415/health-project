@@ -15,6 +15,9 @@ struct RunDetailView: View {
     let onUpdated: () async -> Void
 
     @State private var isShowingEdit = false
+    // App Store Review Guidelines 1.4.1 대응 — 소모 칼로리 계산 근거(MET 출처)를 보여주는
+    // 공용 시트(CalculationSourcesView, ProfileView와 동일한 화면 재사용)
+    @State private var isShowingCalculationSources = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -57,6 +60,12 @@ struct RunDetailView: View {
                         }
                     }
                     .padding(.vertical, 4)
+
+                    Button("계산 근거 보기") {
+                        isShowingCalculationSources = true
+                    }
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
                 }
             }
             .listStyle(.insetGrouped)
@@ -69,6 +78,9 @@ struct RunDetailView: View {
                 isShowingEdit = false
                 Task { await refresh() }
             }, existingRun: run)
+        }
+        .sheet(isPresented: $isShowingCalculationSources) {
+            CalculationSourcesView()
         }
     }
 
