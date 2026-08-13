@@ -538,3 +538,14 @@ ARCHITECTURE.md 섹션4(ERD) 학습, 이후 통합테스트 및 달력 뷰 작�
 - [x] Railway DB에 `heart_rate` 컬럼 nullable ALTER 적용 후 백엔드 배포, 실기기에서 심박수 없이 저장되는 것까지 확인
 
 다음에 할 일: 시연영상 대본 검증·수정 후 촬영 진행.
+
+## 진행상황 2026-08-13
+
+- [x] App Store 심사 승인 — 빌드 1.0(3), 자동 출시로 App Store 공개
+- [x] 다크모드에서 목표 칼로리 배지가 보이지 않던 문제 수정 — 선택 세그먼트 배경이 `Color.white` 고정값이라 다크모드에서 `.primary` 텍스트와 같은 색이 되던 것을 `Color(.systemBackground)`로 교체
+- [x] `[PERF-TEMP]` 진단 로그를 남긴 이유를 3개 파일(`FoodSearchService`·`FoodAutoMatchService`·`AnthropicService`) 상단 주석으로 명시
+- [x] 타임아웃 조치 이후 사실과 달라진 주석 정정 — "타임아웃이 없어 무한정 대기할 수 있음"이 이미 조치된 내용이라 현재 상태에 맞게 수정하고, "제거 예정" 문구 삭제
+- [x] SW명세서 15장·결과보고서 12장 최종 교차 검증 및 반영
+- [x] 백엔드 API 실호출 검증 — 식약처·Anthropic 정상, 라면 완전일치 6건 수치 동일
+
+다음에 할 일: 소스 zip·.ipa 생성 후 USB 담기, 윈도우 노트북에서 열림 확인, 결과보고서 인쇄.
