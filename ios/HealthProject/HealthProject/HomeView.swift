@@ -234,6 +234,9 @@ private struct CalorieReferenceModeToggle: View {
         }
         .padding(3)
         .background(Color(.systemGray6), in: Capsule())
+        // 다크모드에서 트랙 배경(systemGray6)이 카드 배경과 색이 비슷해 경계가 안 보이는
+        // 문제 — 시스템 구분선 색(라이트/다크 모두 대응)으로 얇은 테두리를 둘러 구분되게 함
+        .overlay(Capsule().strokeBorder(Color(.separator), lineWidth: 0.5))
     }
 
     @ViewBuilder
@@ -245,7 +248,11 @@ private struct CalorieReferenceModeToggle: View {
             .padding(.horizontal, 10)
             .background {
                 if isSelected {
-                    Capsule().fill(.white)
+                    // 고정 .white였던 걸 세만틱 색상으로 교체 — 텍스트가 .primary(다크모드에서
+                    // 흰색)를 쓰는데 배경이 고정 흰색이라 다크모드에서 흰 글씨+흰 배경이 되는
+                    // 버그가 있었음. systemBackground도 다크모드에서 어둡게 바뀌므로 항상 반대
+                    // 톤을 유지함
+                    Capsule().fill(Color(.systemBackground))
                 }
             }
             .onTapGesture(perform: action)
