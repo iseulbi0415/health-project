@@ -21,6 +21,12 @@ struct FavoriteAddView: View {
     @State private var showAlert = false
     @State private var alertMessage = ""
 
+    // 저장 시점에 이 값과 digestCategory를 비교해서 사용자가 소화 체감을 직접 바꿨는지 판단함
+    // (FoodRecordEditView.swift의 originalDigestCategory와 동일한 패턴). 체감을 바꾸면 기존
+    // 실측 fatGrams를 지워서, 끼니 합산 시 바뀐 카테고리의 대표값(5/15/30)이 쓰이게 함 —
+    // 이게 없으면 즐겨찾기의 체감을 바꿔도 실측값이 계속 우선돼 사용자 선택이 무시됨
+    private let originalDigestCategory: DigestCategory
+
     // 자동 매칭이 정확한 영양정보를 못 찾았을 때, 검색했던 이름을 그대로 채워서 이 폼으로 연결하기 위한
     // 프리필 파라미터 — 기존 호출부(DietTimerView)는 그대로 인자 없이 호출 가능(기본값 "")
     init(existingFavorite: FavoriteFood? = nil, initialName: String = "", onSave: @escaping (FavoriteFood) -> Void) {
@@ -29,6 +35,7 @@ struct FavoriteAddView: View {
         self._calorieText = State(initialValue: existingFavorite.map { String($0.calorie) } ?? "")
         self._digestCategory = State(initialValue: existingFavorite?.digestCategory ?? .normal)
         self._isTrigger = State(initialValue: existingFavorite?.isTrigger ?? false)
+        self.originalDigestCategory = existingFavorite?.digestCategory ?? .normal
         self.onSave = onSave
     }
 
@@ -97,7 +104,7 @@ struct FavoriteAddView: View {
             calorie: calorie,
             digestCategory: digestCategory,
             isTrigger: isTrigger,
-            fatGrams: existingFavorite?.fatGrams
+            fatGrams: digestCategory == originalDigestCategory ? existingFavorite?.fatGrams : nil
         ))
         Haptics.success()
         dismiss()
