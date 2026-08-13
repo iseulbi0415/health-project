@@ -10,6 +10,11 @@ import java.util.Optional;
 // /api/food-search/auto 오케스트레이션 — 기존 FoodSearchService.searchWithCategory()를 재사용하고
 // (관련도순 정렬 + 최대 15개는 이미 완전일치를 0순위로 두므로 이 기능에도 충분), 그 위에
 // "여러 후보 중 하나를 자동으로 확정"하는 로직만 얹음. FoodSearchService.search()/Controller는 무수정
+//
+// [PERF-TEMP] 로그에 대하여
+// autoMatch 각 단계(식약처 검색 / 후보 선택 / 그램수 추정)의 소요를 남긴다.
+// 2026-08-09 장애 때 어느 단계가 느린지 분리해 보려고 추가했고,
+// 검색이 다시 느려졌을 때 원인 구간을 바로 좁힐 수 있어 남겨 둔다.
 @Slf4j
 @Service
 public class FoodAutoMatchService {
@@ -29,7 +34,7 @@ public class FoodAutoMatchService {
     }
 
     public Optional<FoodAutoMatchResult> autoMatch(String keyword) {
-        // [PERF-TEMP] 음식 검색 20초 지연 원인 측정용 임시 로그 — 원인 파악 후 제거 예정
+        // [PERF-TEMP] 여기부터 autoMatch 전체 소요를 측정 (이유는 파일 상단 주석 참고)
         long perfStart = System.currentTimeMillis();
         List<FoodSearchService.CandidateWithCategory> candidates = foodSearchService.searchWithCategory(keyword);
         log.info("[PERF-TEMP] 1.식약처검색(searchWithCategory) 소요={}ms, keyword={}, 후보={}건",

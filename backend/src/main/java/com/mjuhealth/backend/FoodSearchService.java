@@ -14,6 +14,11 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 
+// [PERF-TEMP] 로그에 대하여
+// 2026-08-09 식약처 API 타임아웃 장애 때, 어느 구간에서 멈추는지 확인하려고
+// 검색 흐름 전체와 개별 페이지 호출의 시작·종료를 남기도록 추가했다.
+// 원인(외부 API 호출에 타임아웃 미설정)은 같은 날 조치했으나,
+// 같은 유형의 지연이 재발했을 때 다시 구간을 좁힐 수 있도록 남겨 둔다.
 @Slf4j
 @Service
 public class FoodSearchService {
@@ -85,7 +90,7 @@ public class FoodSearchService {
     }
 
     private List<FoodSafetyResponse.Item> fetchSortedCandidatesForLiteralKeyword(String keyword) {
-        // [PERF-TEMP] 음식 검색 20초 지연 원인 측정용 임시 로그 — 원인 파악 후 제거 예정
+        // [PERF-TEMP] 여기부터 검색 흐름 전체 소요를 측정 (이유는 파일 상단 주석 참고)
         long perfStart = System.currentTimeMillis();
         String encodedKeyword = URLEncoder.encode(keyword, StandardCharsets.UTF_8);
 
@@ -137,8 +142,9 @@ public class FoodSearchService {
     private FoodSafetyResponse fetchPage(String encodedKeyword, int pageNo) {
         String url = String.format("%s?serviceKey=%s&pageNo=%d&numOfRows=%d&type=json&FOOD_NM_KR=%s",
                 ENDPOINT, serviceKey, pageNo, FETCH_ROWS, encodedKeyword);
-        // [PERF-TEMP] restClient에 타임아웃이 없어서 식약처 API가 응답을 안 주면 여기서 무한정
-        // 대기할 수 있음 — 이 로그 다음에 "호출 완료" 로그가 안 찍히면 바로 여기서 멈춘 것
+        // [PERF-TEMP] 개별 페이지 호출 구간 — 8/9 장애 당시 여기서 응답이 멈췄다.
+        // 원인이던 타임아웃 미설정은 37~42행에서 조치했고(연결 5초/읽기 15초),
+        // 재발 시 다시 이 구간을 좁힐 수 있도록 로그는 남겨 둔다.
         log.info("[PERF-TEMP] 식약처 API 호출 시작: pageNo={}", pageNo);
         long callStart = System.currentTimeMillis();
         FoodSafetyResponse response = restClient.get().uri(url).retrieve().body(FoodSafetyResponse.class);

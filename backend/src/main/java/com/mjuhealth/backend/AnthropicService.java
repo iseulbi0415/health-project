@@ -31,6 +31,13 @@ import java.util.stream.IntStream;
 // 어떤 이유로 실패하든(네트워크/HTTP 오류/응답 파싱 실패/범위 밖 값) 예외를 던지지 않고
 // Optional.empty()로 귀결시킴 — 호출부(FoodAutoMatchService)가 검색 자체를 막지 않고 항상
 // 폴백할 수 있어야 하기 때문
+//
+// [PERF-TEMP] 로그에 대하여
+// 이 파일의 진단 로그는 목적이 셋으로 나뉜다.
+//  - 그램수 추정 3회가 실제로 병렬로 도는지 확인 (스레드명 포함)
+//  - 표준화 제품 경로에서 web_search 1차·2차 중 어느 쪽이 오래 걸리는지 분리 측정
+//  - Claude API 인증 오류 추적 (키 값은 찍지 않고 길이와 앞 8자만)
+// 세 가지 모두 응답이 느리거나 실패했을 때 원인을 좁히기 위한 것이라 남겨 둔다.
 @Slf4j
 @Service
 public class AnthropicService {
